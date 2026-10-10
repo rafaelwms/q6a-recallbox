@@ -1,0 +1,135 @@
+Module                  Size  Used by
+xt_connmark            12288  6
+xt_mark                12288  2
+xt_MASQUERADE          16384  3
+xfrm_user              65536  1
+xfrm_algo              16384  1 xfrm_user
+xt_set                 24576  0
+ip_set                 61440  1 xt_set
+nft_chain_nat          12288  6
+nf_nat                 57344  2 nft_chain_nat,xt_MASQUERADE
+q6prm_clocks           12288  13
+q6apm_dai              24576  1
+q6apm_lpass_dais       16384  1
+snd_q6dsp_common       49152  2 q6apm_lpass_dais,q6prm_clocks
+q6prm                  12288  1 q6prm_clocks
+rfcomm                 98304  4
+algif_hash             16384  1
+algif_skcipher         12288  1
+af_alg                 32768  6 algif_hash,algif_skcipher
+bnep                   32768  2
+aic_btusb              61440  0
+btusb                  81920  0
+btmtk                  32768  1 btusb
+btrtl                  32768  1 btusb
+aic8800_fdrv          860160  0
+btbcm                  24576  1 btusb
+btintel                69632  1 btusb
+bluetooth             958464  35 btrtl,aic_btusb,btmtk,btintel,btbcm,bnep,btusb,rfcomm
+cfg80211             1286144  1 aic8800_fdrv
+tun                    61440  2
+overlay               200704  0
+rfkill                 40960  8 bluetooth,cfg80211
+binfmt_misc            24576  1
+snd_soc_lpass_wsa_macro    69632  0
+ip6t_REJECT            12288  1
+nf_reject_ipv6         20480  1 ip6t_REJECT
+xt_hl                  12288  22
+ip6t_rt                16384  3
+ipt_REJECT             12288  1
+nf_reject_ipv4         12288  1 ipt_REJECT
+xt_LOG                 16384  10
+nf_log_syslog          20480  10
+nft_limit              16384  13
+xt_limit               12288  0
+xt_addrtype            12288  8
+xt_tcpudp              20480  60
+xt_conntrack           12288  21
+nf_conntrack          180224  4 xt_conntrack,nf_nat,xt_connmark,xt_MASQUERADE
+nf_defrag_ipv6         24576  1 nf_conntrack
+nf_defrag_ipv4         12288  1 nf_conntrack
+nft_compat             20480  137
+x_tables               65536  14 xt_conntrack,nft_compat,xt_LOG,xt_tcpudp,xt_addrtype,ip6t_rt,xt_set,ipt_REJECT,xt_connmark,xt_limit,xt_hl,xt_MASQUERADE,ip6t_REJECT,xt_mark
+nf_tables             299008  817 nft_compat,nft_chain_nat,nft_limit
+aic_load_fw           122880  1 aic8800_fdrv
+snd_soc_sc8280xp       12288  4
+qcom_spmi_temp_alarm    20480  0
+snd_soc_qcom_common    16384  1 snd_soc_sc8280xp
+snd_soc_qcom_sdw       12288  1 snd_soc_sc8280xp
+snd_soc_hdmi_codec     24576  1
+squashfs               86016  6
+qcom_spmi_adc5         45056  0
+qcom_iris             180224  0
+videobuf2_dma_contig    24576  1 qcom_iris
+v4l2_mem2mem           49152  1 qcom_iris
+qcom_spmi_adc_tm5      32768  0
+videobuf2_memops       16384  1 videobuf2_dma_contig
+qcom_vadc_common       16384  2 qcom_spmi_adc_tm5,qcom_spmi_adc5
+videobuf2_v4l2         40960  2 qcom_iris,v4l2_mem2mem
+videodev              372736  3 qcom_iris,videobuf2_v4l2,v4l2_mem2mem
+vfat                   24576  1
+videobuf2_common       86016  5 qcom_iris,videobuf2_dma_contig,videobuf2_v4l2,v4l2_mem2mem,videobuf2_memops
+fat                   102400  1 vfat
+snd_q6apm              57344  4 q6apm_dai,q6prm,q6apm_lpass_dais
+mc                     86016  4 videodev,videobuf2_v4l2,videobuf2_common,v4l2_mem2mem
+fastrpc                45056  0
+stm_p_basic            12288  0
+coresight_stm          24576  0
+stm_core               36864  2 coresight_stm,stm_p_basic
+coresight_replicator    20480  0
+coresight_funnel       20480  0
+coresight_tmc          65536  0
+coresight             110592  4 coresight_tmc,coresight_stm,coresight_replicator,coresight_funnel
+qcrypto                45056  0
+snd_soc_lpass_va_macro    57344  3
+snd_soc_lpass_tx_macro    98304  2
+snd_soc_lpass_rx_macro   114688  2
+soundwire_qcom         40960  2
+authenc                12288  1 qcrypto
+qcom_rng               12288  0
+snd_soc_wcd938x       106496  1
+snd_soc_wcd_mbhc       36864  1 snd_soc_wcd938x
+snd_soc_wcd_classh     24576  1 snd_soc_wcd938x
+snd_soc_core          372736  15 snd_q6apm,q6apm_dai,snd_soc_sc8280xp,snd_soc_qcom_common,q6apm_lpass_dais,snd_soc_hdmi_codec,snd_soc_lpass_wsa_macro,snd_soc_qcom_sdw,snd_soc_lpass_va_macro,snd_soc_wcd938x,snd_soc_wcd_mbhc,snd_soc_lpass_rx_macro,soundwire_qcom,snd_soc_lpass_tx_macro,snd_soc_wcd_classh
+snd_compress           36864  1 snd_soc_core
+snd_pcm_dmaengine      16384  1 snd_soc_core
+snd_pcm               172032  7 q6apm_dai,q6apm_lpass_dais,snd_soc_hdmi_codec,snd_compress,snd_soc_core,snd_soc_lpass_rx_macro,snd_pcm_dmaengine
+snd_soc_wcd938x_sdw    20480  1 snd_soc_wcd938x
+regmap_sdw             12288  1 snd_soc_wcd938x_sdw
+snd_timer              49152  1 snd_pcm
+snd_soc_wcd_common     16384  2 snd_soc_wcd938x_sdw,snd_soc_wcd938x
+snd                   118784  14 snd_soc_qcom_common,snd_soc_hdmi_codec,snd_timer,snd_compress,snd_soc_core,snd_pcm
+soundwire_bus        1191936  6 regmap_sdw,snd_soc_wcd_common,snd_soc_wcd938x_sdw,snd_soc_qcom_sdw,snd_soc_wcd938x,soundwire_qcom
+slimbus                36864  1 soundwire_qcom
+soundcore              12288  1 snd
+snd_soc_lpass_macro_common    12288  4 snd_soc_lpass_wsa_macro,snd_soc_lpass_va_macro,snd_soc_lpass_rx_macro,snd_soc_lpass_tx_macro
+lpasscorecc_sc7280     20480  0
+lpasscc_sc7280         16384  0
+fuse                  249856  3
+autofs4                53248  2
+rpmsg_ctrl             12288  0
+qrtr_smd               16384  0
+rpmsg_char             24576  1 rpmsg_ctrl
+rtc_ds1307             45056  0
+qcom_pd_mapper         28672  0
+qcom_pon               12288  0
+nvmem_qcom_spmi_sdam    16384  1
+spi_geni_qcom          45056  0
+i2c_qcom_geni          32768  0
+qrtr                   53248  13 qrtr_smd
+qcom_q6v5_pas          49152  0
+qcom_pil_info          12288  1 qcom_q6v5_pas
+qcom_common            16384  1 qcom_q6v5_pas
+r8169                 122880  0
+qcom_glink_smem        12288  1 qcom_common
+camcc_sc7280           57344  0
+videocc_sc7280         20480  6
+gpi                    40960  16
+dwc3_qcom              24576  0
+qcom_q6v5              16384  1 qcom_q6v5_pas
+pinctrl_sc7280_lpass_lpi    16384  0
+pinctrl_lpass_lpi      16384  12 pinctrl_sc7280_lpass_lpi
+qcom_sysmon            24576  2 qcom_q6v5_pas,qcom_q6v5
+lpassaudiocc_sc7280    28672  2
+qcom_wdt               12288  0
+nvmem_reboot_mode      12288  0
