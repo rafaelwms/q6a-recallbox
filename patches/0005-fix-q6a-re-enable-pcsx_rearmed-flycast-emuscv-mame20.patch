@@ -1,0 +1,101 @@
+From fff7279fe7e66943260e7798264ed73d9cdf9d01 Mon Sep 17 00:00:00 2001
+From: Rafael WMS <rafael.wms@live.com>
+Date: Sat, 10 Oct 2026 17:23:04 -0300
+Subject: [PATCH 5/5] fix(q6a): re-enable pcsx_rearmed, flycast, emuscv,
+ mame2015 with Q6A/host fixes
+
+---
+ configs/recalbox-q6a_defconfig                         | 8 ++++----
+ package/libretro-flycast/libretro-flycast.mk           | 5 +++++
+ package/libretro-mame2015/libretro-mame2015.mk         | 6 ++++++
+ package/libretro-pcsx_rearmed/libretro-pcsx_rearmed.mk | 5 +++++
+ 4 files changed, 20 insertions(+), 4 deletions(-)
+
+diff --git a/configs/recalbox-q6a_defconfig b/configs/recalbox-q6a_defconfig
+index a6af6dd..8d66f24 100644
+--- a/configs/recalbox-q6a_defconfig
++++ b/configs/recalbox-q6a_defconfig
+@@ -234,11 +234,11 @@ BR2_PACKAGE_LIBRETRO_DOSBOX_PURE=y
+ BR2_PACKAGE_LIBRETRO_EASYRPG=y
+ BR2_PACKAGE_LIBRETRO_ECWOLF=y
+ BR2_PACKAGE_LIBRETRO_EIGHTYONE=y
+-# BR2_PACKAGE_LIBRETRO_EMUSCV is not set
++BR2_PACKAGE_LIBRETRO_EMUSCV=y
+ BR2_PACKAGE_LIBRETRO_FAKE08=y
+ BR2_PACKAGE_LIBRETRO_FBNEO=y
+ BR2_PACKAGE_LIBRETRO_FCEUMM=y
+-# BR2_PACKAGE_LIBRETRO_FLYCAST is not set
++BR2_PACKAGE_LIBRETRO_FLYCAST=y
+ # BR2_PACKAGE_LIBRETRO_FLYCAST_NEXT is not set
+ BR2_PACKAGE_LIBRETRO_FMSX=y
+ BR2_PACKAGE_LIBRETRO_FREECHAF=y
+@@ -264,7 +264,7 @@ BR2_PACKAGE_LIBRETRO_M2000=y
+ BR2_PACKAGE_LIBRETRO_MAME2003_PLUS=y
+ BR2_PACKAGE_LIBRETRO_MAME2003=y
+ BR2_PACKAGE_LIBRETRO_MAME2010=y
+-# BR2_PACKAGE_LIBRETRO_MAME2015 is not set
++BR2_PACKAGE_LIBRETRO_MAME2015=y
+ BR2_PACKAGE_LIBRETRO_MELONDS=y
+ BR2_PACKAGE_LIBRETRO_MESEN=y
+ BR2_PACKAGE_LIBRETRO_MESEN_S=y
+@@ -282,7 +282,7 @@ BR2_PACKAGE_LIBRETRO_NXENGINE=y
+ BR2_PACKAGE_LIBRETRO_O2EM=y
+ BR2_PACKAGE_LIBRETRO_OPERA=y
+ BR2_PACKAGE_LIBRETRO_PARALLEL_N64=y
+-# BR2_PACKAGE_LIBRETRO_PCSX_REARMED is not set
++BR2_PACKAGE_LIBRETRO_PCSX_REARMED=y
+ BR2_PACKAGE_LIBRETRO_PD777=y
+ BR2_PACKAGE_LIBRETRO_PICODRIVE=y
+ BR2_PACKAGE_LIBRETRO_POKEMINI=y
+diff --git a/package/libretro-flycast/libretro-flycast.mk b/package/libretro-flycast/libretro-flycast.mk
+index 61868e1..5d8ab39 100644
+--- a/package/libretro-flycast/libretro-flycast.mk
++++ b/package/libretro-flycast/libretro-flycast.mk
+@@ -36,6 +36,11 @@ endif
+ 
+ LIBRETRO_FLYCAST_SUPP_OPT += ARCH=$(BR2_NORMALIZED_ARCH)
+ 
++# Q6A: Mesa in this tree has no Vulkan driver (Turnip) yet
++ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
++LIBRETRO_FLYCAST_SUPP_OPT += HAVE_VULKAN=0
++endif
++
+ ifeq ($(BR2_PACKAGE_RECALBOX_HAS_LIBGLES),y)
+ LIBRETRO_FLYCAST_SUPP_OPT += FORCE_GLES=1
+ LIBRETRO_FLYCAST_DEPENDENCIES += libgles
+diff --git a/package/libretro-mame2015/libretro-mame2015.mk b/package/libretro-mame2015/libretro-mame2015.mk
+index d52823b..afcf332 100644
+--- a/package/libretro-mame2015/libretro-mame2015.mk
++++ b/package/libretro-mame2015/libretro-mame2015.mk
+@@ -29,6 +29,12 @@ else
+ LIBRETRO_MAME2015_AARCH64OPTS =
+ endif
+ 
++# Generator scripts use open(..., 'rU'), removed in Python 3.11+
++define LIBRETRO_MAME2015_FIX_PYTHON_RU
++	find $(@D)/src -name '*.py' -exec $(SED) "s/'rU'/'r'/g; s/\"rU\"/\"r\"/g" {} +
++endef
++LIBRETRO_MAME2015_POST_PATCH_HOOKS += LIBRETRO_MAME2015_FIX_PYTHON_RU
++
+ define LIBRETRO_MAME2015_BUILD_CMDS
+ 	$(SED) "s|^CONLYFLAGS =|CONLYFLAGS = $(LIBRETRO_MAME2015_CFLAGSO) $(LIBRETRO_MAME2015_AARCH64OPTS)|g" $(@D)/Makefile
+ 	$(SED) "s|^CPPONLYFLAGS =|CPPONLYFLAGS = $(LIBRETRO_MAME2015_CXXFLAGSO) $(LIBRETRO_MAME2015_AARCH64OPTS)|g" $(@D)/Makefile
+diff --git a/package/libretro-pcsx_rearmed/libretro-pcsx_rearmed.mk b/package/libretro-pcsx_rearmed/libretro-pcsx_rearmed.mk
+index 06becfc..faf7d14 100644
+--- a/package/libretro-pcsx_rearmed/libretro-pcsx_rearmed.mk
++++ b/package/libretro-pcsx_rearmed/libretro-pcsx_rearmed.mk
+@@ -28,6 +28,11 @@ LIBRETRO_PCSX_REARMED_PLATFORM=unix
+ LIBRETRO_PCSX_REARMED_OPTS= BUILTIN_GPU=neon DYNAREC=
+ endif
+ 
++# Q6A: Makefile.libretro does not link libretro-common VFS (rfopen) unless asked
++ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
++LIBRETRO_PCSX_REARMED_OPTS += USE_LIBRETRO_VFS=1
++endif
++
+ define LIBRETRO_PCSX_REARMED_BUILD_CMDS
+ 	CFLAGS="$(TARGET_CFLAGS) $(COMPILER_COMMONS_CFLAGS_SO)" \
+ 		CXXFLAGS="$(TARGET_CXXFLAGS) $(COMPILER_COMMONS_CXXFLAGS_SO)" \
+-- 
+2.53.0
+
