@@ -72,3 +72,7 @@ The user then freed ~70 GiB at the end of the disk. Installation is only:
    space of the same disk and understands `nvme0n1pN` names. rEFInd (fallback install in the ESP) lists the new EFI entry automatically.
 4. The kernel command line selects the boot partition by label `RECALBOX`: unplug any other disk carrying that label before the first boot.
 Throughput note: copying ROMs from a Mac over Wi-Fi gave only ~3 MB/s; use a wired link or plug the SSD/SD directly.
+Result: first boot from the NVMe worked on the first try. S11share created p6 SHARE (62.7 GiB exFAT) and p7 OVERLAY (1 GiB ext4);
+/boot = nvme0n1p5, share = p6; wlan0, hci0 and the sound card are present; no I/O errors in dmesg. Note: after the very first boot
+/overlay is still a tmpfs - reboot once so the OVERLAY partition is used. Settings (Wi-Fi, Bluetooth pairings, recalbox.conf) live in
+the share, so a fresh install starts with defaults; copy `share/system` from the old install to keep them.
