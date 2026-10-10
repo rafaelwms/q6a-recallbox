@@ -1,7 +1,7 @@
 From 68277d93c193beef5f49e9a9300efbbc559fa45f Mon Sep 17 00:00:00 2001
 From: Rafael WMS <rafael.wms@live.com>
 Date: Sat, 10 Oct 2026 15:47:31 -0300
-Subject: [PATCH 2/3] fix(q6a): per-target platform branches, qemu/gcc host
+Subject: [PATCH 2/4] fix(q6a): per-target platform branches, qemu/gcc host
  fixes, disable broken packages
 
 ---

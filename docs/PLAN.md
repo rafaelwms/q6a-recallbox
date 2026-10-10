@@ -46,3 +46,16 @@ Build host: Desktop (20c/61GB), ~87 min cold, ~7 min incremental (ccache). Notes
 TODO re-enable / fix (disabled for the first image): Kodi, libretro-{emuscv,flycast,flycast-next,mame2015,pcsx_rearmed,vircon32}, wsd (upstream repo gone),
 out-of-tree modules (xone, xpad-noone, xpadneo, rtl8812au, rtl88x2bu, rtw89).
 Not yet verified on hardware: boot, squashfs/overlay in kernel, HDMI, Wi-Fi (AIC8800), audio, input.
+
+### 2026-10-10 - First boot on hardware (USB SATA SSD): OK
+Booted straight into EmulationStation; 8BitDo pad (USB) works; games run (NES, Mega Drive tested); Ethernet works.
+Fixed after first boot (rootfs updated over the network, no reflash needed):
+- No sound card / no Wi-Fi / no Bluetooth. Root cause: missing firmware, not the kernel. DSP firmware
+  (`qcom/qcs6490/radxa/dragon-q6a/{adsp,cdsp}.mbn`), `qcom/qcm6490/qupv3fw.elf`, AudioReach topology and the Radxa
+  alsa-ucm-conf backport come from the Radxa .deb packages (new package `q6a-firmware`); the AIC8800 USB Wi-Fi/BT
+  driver is built out of tree from the Radxa DKMS source (new package `aic8800`).
+- Result: ALSA card `QCS6490-Radxa-Dragon-Q6A` registered, PulseAudio+UCM exposes HDMI and Headphones sinks (PCM hw_ptr advances);
+  `wlan0` scans, `hci0` UP; a Bluetooth speaker pairs and shows up as an A2DP sink.
+Notes: the kernel/ADSP log lines `qcom-apm ... CMD timeout` and `SWR Port collision` also appear on the working Ubuntu image (benign).
+Live test of `tsched=no` on module-alsa-card (PulseAudio) - not persisted yet, pending confirmation it is needed.
+Update the board without reflashing: copy `output/images/boot-data/boot/recalbox` to `/boot/boot/recalbox.new` (remount /boot rw), rename, reboot.

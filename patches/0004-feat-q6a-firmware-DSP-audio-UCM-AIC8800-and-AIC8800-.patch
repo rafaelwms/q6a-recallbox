@@ -1,0 +1,167 @@
+From c03e5bc0d2fae7f65a49255d5987f9636bdacb22 Mon Sep 17 00:00:00 2001
+From: Rafael WMS <rafael.wms@live.com>
+Date: Sat, 10 Oct 2026 16:47:27 -0300
+Subject: [PATCH 4/4] feat(q6a): firmware (DSP/audio/UCM/AIC8800) and AIC8800
+ Wi-Fi/BT driver packages
+
+---
+ Config.in                              |  4 ++++
+ package/aic8800/Config.in              | 12 +++++++++++
+ package/aic8800/aic8800.hash           |  1 +
+ package/aic8800/aic8800.mk             | 21 ++++++++++++++++++
+ package/q6a-firmware/Config.in         |  9 ++++++++
+ package/q6a-firmware/q6a-firmware.hash |  4 ++++
+ package/q6a-firmware/q6a-firmware.mk   | 30 ++++++++++++++++++++++++++
+ package/recalbox-system/Config.in      |  2 ++
+ 8 files changed, 83 insertions(+)
+ create mode 100644 package/aic8800/Config.in
+ create mode 100644 package/aic8800/aic8800.hash
+ create mode 100644 package/aic8800/aic8800.mk
+ create mode 100644 package/q6a-firmware/Config.in
+ create mode 100644 package/q6a-firmware/q6a-firmware.hash
+ create mode 100644 package/q6a-firmware/q6a-firmware.mk
+
+diff --git a/Config.in b/Config.in
+index aef8a0e..46ca0a4 100644
+--- a/Config.in
++++ b/Config.in
+@@ -22,6 +22,10 @@ menu "Recalbox"
+       source "$BR2_EXTERNAL_RECALBOX_PATH/package/librga/Config.in"
+       source "$BR2_EXTERNAL_RECALBOX_PATH/package/rkwifibt/Config.in"
+     endmenu
++    menu "Qualcomm"
++      source "$BR2_EXTERNAL_RECALBOX_PATH/package/q6a-firmware/Config.in"
++      source "$BR2_EXTERNAL_RECALBOX_PATH/package/aic8800/Config.in"
++    endmenu
+     menu "Hardkernel"
+ 			menu "odroidgo2"
+         source "$BR2_EXTERNAL_RECALBOX_PATH/package/libgo2/Config.in"
+diff --git a/package/aic8800/Config.in b/package/aic8800/Config.in
+new file mode 100644
+index 0000000..1fc0228
+--- /dev/null
++++ b/package/aic8800/Config.in
+@@ -0,0 +1,12 @@
++comment "aic8800 needs a Linux kernel to be built"
++	depends on !BR2_LINUX_KERNEL
++
++config BR2_PACKAGE_AIC8800
++	bool "aic8800"
++	depends on BR2_LINUX_KERNEL
++	help
++	  AICSemi AIC8800 USB Wi-Fi + Bluetooth drivers (aic_load_fw,
++	  aic8800_fdrv, aic_btusb), as packaged by Radxa. The onboard
++	  Wi-Fi/BT module of the Dragon Q6A uses this chip.
++
++	  https://github.com/radxa-pkg/aic8800
+diff --git a/package/aic8800/aic8800.hash b/package/aic8800/aic8800.hash
+new file mode 100644
+index 0000000..ea2b198
+--- /dev/null
++++ b/package/aic8800/aic8800.hash
+@@ -0,0 +1 @@
++sha256  eaa6ac3f46b43e1235f869a486302c919db75e6704618bb3889153446de64a8f  aic8800-usb-dkms_5.0+git20260123.5f7be68d-9_all.deb
+diff --git a/package/aic8800/aic8800.mk b/package/aic8800/aic8800.mk
+new file mode 100644
+index 0000000..096b23a
+--- /dev/null
++++ b/package/aic8800/aic8800.mk
+@@ -0,0 +1,21 @@
++################################################################################
++#
++# aic8800
++#
++################################################################################
++
++AIC8800_VERSION = 5.0+git20260123.5f7be68d-9
++AIC8800_SOURCE = aic8800-usb-dkms_$(AIC8800_VERSION)_all.deb
++AIC8800_SITE = https://github.com/radxa-pkg/aic8800/releases/download/5.0%2Bgit20260123.5f7be68d-9
++AIC8800_LICENSE = GPL-2.0
++
++# The driver sources ship inside the DKMS package
++define AIC8800_EXTRACT_CMDS
++	dpkg-deb -x $(AIC8800_DL_DIR)/$(AIC8800_SOURCE) $(@D)
++endef
++
++AIC8800_SRC = usr/src/aic8800-usb-$(AIC8800_VERSION)/USB/driver_fw/drivers
++AIC8800_MODULE_SUBDIRS = $(AIC8800_SRC)/aic8800 $(AIC8800_SRC)/aic_btusb
++
++$(eval $(kernel-module))
++$(eval $(generic-package))
+diff --git a/package/q6a-firmware/Config.in b/package/q6a-firmware/Config.in
+new file mode 100644
+index 0000000..138a94c
+--- /dev/null
++++ b/package/q6a-firmware/Config.in
+@@ -0,0 +1,9 @@
++config BR2_PACKAGE_Q6A_FIRMWARE
++	bool "q6a-firmware"
++	select BR2_PACKAGE_ALSA_UCM_CONF
++	help
++	  Radxa Dragon Q6A (QCS6490) firmware and audio configuration:
++	  DSP firmware (adsp/cdsp), QUP firmware, AudioReach topology,
++	  Radxa alsa-ucm-conf backport and AIC8800 Wi-Fi/Bluetooth firmware.
++
++	  https://github.com/radxa-pkg
+diff --git a/package/q6a-firmware/q6a-firmware.hash b/package/q6a-firmware/q6a-firmware.hash
+new file mode 100644
+index 0000000..67404a1
+--- /dev/null
++++ b/package/q6a-firmware/q6a-firmware.hash
+@@ -0,0 +1,4 @@
++sha256  20d99dcb241376d62c67e87c4af9c6cf0a44e45aedf68e15d5ba9ebba95261b5  radxa-firmware-qcs6490_0.2.42_all.deb
++sha256  f803b8c273e5c539153881684cdfee71433ce3b48daecfdac7aeb1994a2e7f8f  firmware-qcom-audioreach_1.0.4-3_all.deb
++sha256  a3c495587673523b79f2014f83e1fc9934a7f93e5f64cd318426046207fb8751  alsa-ucm-conf_1.2.16.1-radxa-2_all.deb
++sha256  1dbc31172830232bfdc53d6416fc73d9a2c80fe862545c51a1398f671b7a55ca  aic8800-firmware_5.0+git20260123.5f7be68d-9_all.deb
+diff --git a/package/q6a-firmware/q6a-firmware.mk b/package/q6a-firmware/q6a-firmware.mk
+new file mode 100644
+index 0000000..ec1f19a
+--- /dev/null
++++ b/package/q6a-firmware/q6a-firmware.mk
+@@ -0,0 +1,30 @@
++################################################################################
++#
++# q6a-firmware
++#
++################################################################################
++
++Q6A_FIRMWARE_VERSION = 0.2.42
++Q6A_FIRMWARE_SOURCE = radxa-firmware-qcs6490_$(Q6A_FIRMWARE_VERSION)_all.deb
++Q6A_FIRMWARE_SITE = https://github.com/radxa-pkg/radxa-firmware/releases/download/$(Q6A_FIRMWARE_VERSION)
++Q6A_FIRMWARE_EXTRA_DOWNLOADS = \
++	https://github.com/radxa-pkg/audioreach-topology/releases/download/1.0.4-3/firmware-qcom-audioreach_1.0.4-3_all.deb \
++	https://github.com/radxa-pkg/alsa-ucm-conf/releases/download/1.2.16.1-radxa-2/alsa-ucm-conf_1.2.16.1-radxa-2_all.deb \
++	https://github.com/radxa-pkg/aic8800/releases/download/5.0%2Bgit20260123.5f7be68d-9/aic8800-firmware_5.0+git20260123.5f7be68d-9_all.deb
++Q6A_FIRMWARE_LICENSE = Proprietary (Qualcomm/Radxa firmware), BSD-3-Clause (alsa-ucm-conf)
++Q6A_FIRMWARE_REDISTRIBUTE = NO
++Q6A_FIRMWARE_DEPENDENCIES = alsa-ucm-conf
++
++# Debian packages: merge all of them in the build dir (same relative layout)
++define Q6A_FIRMWARE_EXTRACT_CMDS
++	for deb in $(Q6A_FIRMWARE_DL_DIR)/*.deb; do dpkg-deb -x $$deb $(@D) || exit 1; done
++endef
++
++define Q6A_FIRMWARE_INSTALL_TARGET_CMDS
++	mkdir -p $(TARGET_DIR)/lib/firmware $(TARGET_DIR)/usr/share/alsa
++	rsync -a --exclude=aic8800_fw/PCIE --exclude=aic8800_fw/SDIO $(@D)/lib/firmware/ $(TARGET_DIR)/lib/firmware/
++	# Radxa UCM backport (adds the Dragon Q6A matcher) overrides the stock ucm2 tree
++	cp -a $(@D)/usr/share/alsa/ucm2 $(TARGET_DIR)/usr/share/alsa/
++endef
++
++$(eval $(generic-package))
+diff --git a/package/recalbox-system/Config.in b/package/recalbox-system/Config.in
+index fc497f8..02bb04e 100644
+--- a/package/recalbox-system/Config.in
++++ b/package/recalbox-system/Config.in
+@@ -133,6 +133,8 @@ config BR2_PACKAGE_RECALBOX_TARGET_Q6A
+ 	select BR2_PACKAGE_LINUX_FIRMWARE
+ 	select BR2_PACKAGE_LINUX_FIRMWARE_QCOM_ADRENO
+ 	select BR2_PACKAGE_LINUX_FIRMWARE_QCOM_VENUS
++	select BR2_PACKAGE_Q6A_FIRMWARE
++	select BR2_PACKAGE_AIC8800
+ 
+ config BR2_PACKAGE_RECALBOX_TARGET_X86_64
+ 	bool "x86_64"
+-- 
+2.53.0
+
