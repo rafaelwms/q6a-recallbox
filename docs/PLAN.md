@@ -48,7 +48,7 @@ out-of-tree modules (xone, xpad-noone, xpadneo, rtl8812au, rtl88x2bu, rtw89).
 Not yet verified on hardware: boot, squashfs/overlay in kernel, HDMI, Wi-Fi (AIC8800), audio, input.
 
 ### 2026-10-10 - First boot on hardware (USB SATA SSD): OK
-Booted straight into EmulationStation; 8BitDo pad (USB) works; games run (NES, Mega Drive tested); Ethernet works.
+Booted straight into EmulationStation; 8BitDo pad (USB) works; games run (NES confirmed; PS1 and Dreamcast confirmed later); Ethernet works.
 Fixed after first boot (rootfs updated over the network, no reflash needed):
 - No sound card / no Wi-Fi / no Bluetooth. Root cause: missing firmware, not the kernel. DSP firmware
   (`qcom/qcs6490/radxa/dragon-q6a/{adsp,cdsp}.mbn`), `qcom/qcm6490/qupv3fw.elf`, AudioReach topology and the Radxa

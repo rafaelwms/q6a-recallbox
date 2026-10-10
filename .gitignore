@@ -1,5 +1,6 @@
-/recalbox/
-/output/
-/dl/
 *.img
 *.img.xz
+/dl/
+/output/
+/recalbox/
+/release/
