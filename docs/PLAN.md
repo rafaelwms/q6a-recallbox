@@ -60,3 +60,15 @@ Notes: the kernel/ADSP log lines `qcom-apm ... CMD timeout` and `SWR Port collis
 Confirmed on hardware by the user: HDMI audio, headphone jack audio, Bluetooth audio + BT gamepad, Wi-Fi all work. `tsched=no` was not needed (not persisted).
 Cosmetic: a few seconds of white screen at boot (GPU firmware loads after rootfs mount); could be fixed by embedding a660 firmware in the initramfs.
 Update the board without reflashing: copy `output/images/boot-data/boot/recalbox` to `/boot/boot/recalbox.new` (remount /boot rw), rename, reboot.
+
+### 2026-10-10 - Recalbox installed on the internal NVMe (free space after the Ubuntu partition)
+Shrinking the Ubuntu ext4 from the running Recalbox was attempted and aborted: during heavy NVMe I/O the NVMe and the USB hub both
+dropped (brown-out suspected; kernel logged `Host Aborted Command` and the NVMe node disappeared). Nothing was lost (fsck clean,
+GPT unchanged) but it is not worth repeating: shrink offline / with a solid PD supply, or do it from a live system with the disk unmounted.
+The user then freed ~70 GiB at the end of the disk. Installation is only:
+1. `sgdisk -n 5:<aligned start>:+5GiB -t 5:EF00 -c 5:boot /dev/nvme0n1` in the free space (5 GiB), `mkfs.vfat -F 32 -n RECALBOX /dev/nvme0n1p5`.
+2. `rsync` the whole `output/images/boot-data/` tree onto it (EFI/BOOT/bootaa64.efi = GRUB, boot/{linux,initrd.gz,recalbox}); verify with sha256.
+3. Leave the rest unallocated: Recalbox's first boot (`S11share`) creates SHARE (exFAT) and OVERLAY (ext4, 1 GiB) in the LAST free
+   space of the same disk and understands `nvme0n1pN` names. rEFInd (fallback install in the ESP) lists the new EFI entry automatically.
+4. The kernel command line selects the boot partition by label `RECALBOX`: unplug any other disk carrying that label before the first boot.
+Throughput note: copying ROMs from a Mac over Wi-Fi gave only ~3 MB/s; use a wired link or plug the SSD/SD directly.
