@@ -57,5 +57,6 @@ Fixed after first boot (rootfs updated over the network, no reflash needed):
 - Result: ALSA card `QCS6490-Radxa-Dragon-Q6A` registered, PulseAudio+UCM exposes HDMI and Headphones sinks (PCM hw_ptr advances);
   `wlan0` scans, `hci0` UP; a Bluetooth speaker pairs and shows up as an A2DP sink.
 Notes: the kernel/ADSP log lines `qcom-apm ... CMD timeout` and `SWR Port collision` also appear on the working Ubuntu image (benign).
-Live test of `tsched=no` on module-alsa-card (PulseAudio) - not persisted yet, pending confirmation it is needed.
+Confirmed on hardware by the user: HDMI audio, headphone jack audio, Bluetooth audio + BT gamepad, Wi-Fi all work. `tsched=no` was not needed (not persisted).
+Cosmetic: a few seconds of white screen at boot (GPU firmware loads after rootfs mount); could be fixed by embedding a660 firmware in the initramfs.
 Update the board without reflashing: copy `output/images/boot-data/boot/recalbox` to `/boot/boot/recalbox.new` (remount /boot rw), rename, reboot.
