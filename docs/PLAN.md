@@ -33,3 +33,16 @@ Hybrid of two existing targets:
 ## Open items
 - Linux build host access (ssh) - pending from user.
 - Pick kernel source: vanilla + our patch queue vs. Armbian edge tree.
+
+## Status log
+### 2026-10-10 - M1 done: first image builds (`recalbox-q6a.img.xz`, ~1.6 GB)
+Build host: Desktop (20c/61GB), ~87 min cold, ~7 min incremental (ccache). Notes to reproduce:
+- Host needs: gcc-14 wrappers (Ubuntu 26.04 default GCC 15 / C23 breaks old host pkgs; `-std=gnu17`, `-Wno-error=incompatible-pointer-types`),
+  cmake 3.31 first in PATH (CMake 4 rejects old policies), `CMAKE_POLICY_VERSION_MINIMUM=3.5`, `LC_ALL=C`, aclocal-1.16/automake-1.16 symlinks.
+- gitlab.com `/-/archive/` tarballs return 403: fetch via REST API into `dl/` (scripts/fetch_gitlab.py).
+- Patches carried: qemu `sched_attr` rename (glibc 2.41+), GCC 14.2 libsanitizer without linux/scc.h.
+- Q6A added next to RG353X in the per-target emulator branches (generic arm64).
+
+TODO re-enable / fix (disabled for the first image): Kodi, libretro-{emuscv,flycast,flycast-next,mame2015,pcsx_rearmed,vircon32}, wsd (upstream repo gone),
+out-of-tree modules (xone, xpad-noone, xpadneo, rtl8812au, rtl88x2bu, rtw89).
+Not yet verified on hardware: boot, squashfs/overlay in kernel, HDMI, Wi-Fi (AIC8800), audio, input.

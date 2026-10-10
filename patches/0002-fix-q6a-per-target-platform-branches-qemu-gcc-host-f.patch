@@ -1,0 +1,318 @@
+From 68277d93c193beef5f49e9a9300efbbc559fa45f Mon Sep 17 00:00:00 2001
+From: Rafael WMS <rafael.wms@live.com>
+Date: Sat, 10 Oct 2026 15:47:31 -0300
+Subject: [PATCH 2/2] fix(q6a): per-target platform branches, qemu/gcc host
+ fixes, disable broken packages
+
+---
+ .../0001-libsanitizer-drop-linux-scc.patch    | 21 ++++++++
+ .../0001-linux-user-rename-sched_attr.patch   | 53 +++++++++++++++++++
+ configs/recalbox-q6a_defconfig                | 28 +++++-----
+ .../libretro-amiberry/libretro-amiberry.mk    |  2 +-
+ package/libretro-flycast/libretro-flycast.mk  |  2 +-
+ .../libretro-mupen64plus-nx.mk                |  2 +-
+ .../libretro-parallel-n64.mk                  |  2 +-
+ .../libretro-pcsx_rearmed.mk                  |  2 +-
+ package/libretro-scummvm/libretro-scummvm.mk  |  2 +-
+ .../libretro-supafaust/libretro-supafaust.mk  |  2 +-
+ .../libretro-tamalibretro.mk                  |  2 +-
+ .../libretro-yabasanshiro.mk                  |  2 +-
+ 12 files changed, 97 insertions(+), 23 deletions(-)
+ create mode 100644 board/recalbox/patches/gcc/14.2.0/0001-libsanitizer-drop-linux-scc.patch
+ create mode 100644 board/recalbox/patches/qemu/0001-linux-user-rename-sched_attr.patch
+
+diff --git a/board/recalbox/patches/gcc/14.2.0/0001-libsanitizer-drop-linux-scc.patch b/board/recalbox/patches/gcc/14.2.0/0001-libsanitizer-drop-linux-scc.patch
+new file mode 100644
+index 0000000..2992bbe
+--- /dev/null
++++ b/board/recalbox/patches/gcc/14.2.0/0001-libsanitizer-drop-linux-scc.patch
+@@ -0,0 +1,21 @@
++libsanitizer: drop linux/scc.h (removed from kernel headers >= 6.x)
++
++--- a/libsanitizer/sanitizer_common/sanitizer_platform_limits_posix.cpp	2026-10-10 14:00:12.140531352 -0300
+++++ b/libsanitizer/sanitizer_common/sanitizer_platform_limits_posix.cpp	2026-10-10 14:00:12.144602782 -0300
++@@ -151,7 +151,6 @@
++ #include <linux/lp.h>
++ #include <linux/mroute.h>
++ #include <linux/mroute6.h>
++-#include <linux/scc.h>
++ #include <linux/serial.h>
++ #include <sys/msg.h>
++ #include <sys/ipc.h>
++@@ -520,8 +519,6 @@
++   unsigned struct_kbsentry_sz = sizeof(struct kbsentry);
++   unsigned struct_mtconfiginfo_sz = sizeof(struct mtconfiginfo);
++   unsigned struct_nr_parms_struct_sz = sizeof(struct nr_parms_struct);
++-  unsigned struct_scc_modem_sz = sizeof(struct scc_modem);
++-  unsigned struct_scc_stat_sz = sizeof(struct scc_stat);
++   unsigned struct_serial_multiport_struct_sz
++       = sizeof(struct serial_multiport_struct);
++   unsigned struct_serial_struct_sz = sizeof(struct serial_struct);
+diff --git a/board/recalbox/patches/qemu/0001-linux-user-rename-sched_attr.patch b/board/recalbox/patches/qemu/0001-linux-user-rename-sched_attr.patch
+new file mode 100644
+index 0000000..02ea90e
+--- /dev/null
++++ b/board/recalbox/patches/qemu/0001-linux-user-rename-sched_attr.patch
+@@ -0,0 +1,53 @@
++linux-user: rename local struct sched_attr (glibc >= 2.41 now defines it)
++
++--- a/linux-user/syscall.c	2026-10-10 13:54:47.981433089 -0300
+++++ b/linux-user/syscall.c	2026-10-10 13:54:47.986435794 -0300
++@@ -359,7 +359,7 @@
++ _syscall3(int, sys_sched_setaffinity, pid_t, pid, unsigned int, len,
++           unsigned long *, user_mask_ptr);
++ /* sched_attr is not defined in glibc */
++-struct sched_attr {
+++struct qemu_sched_attr {
++     uint32_t size;
++     uint32_t sched_policy;
++     uint64_t sched_flags;
++@@ -372,10 +372,10 @@
++     uint32_t sched_util_max;
++ };
++ #define __NR_sys_sched_getattr __NR_sched_getattr
++-_syscall4(int, sys_sched_getattr, pid_t, pid, struct sched_attr *, attr,
+++_syscall4(int, sys_sched_getattr, pid_t, pid, struct qemu_sched_attr *, attr,
++           unsigned int, size, unsigned int, flags);
++ #define __NR_sys_sched_setattr __NR_sched_setattr
++-_syscall3(int, sys_sched_setattr, pid_t, pid, struct sched_attr *, attr,
+++_syscall3(int, sys_sched_setattr, pid_t, pid, struct qemu_sched_attr *, attr,
++           unsigned int, flags);
++ #define __NR_sys_sched_getscheduler __NR_sched_getscheduler
++ _syscall1(int, sys_sched_getscheduler, pid_t, pid);
++@@ -11380,7 +11380,7 @@
++     case TARGET_NR_sched_getattr:
++         {
++             struct target_sched_attr *target_scha;
++-            struct sched_attr scha;
+++            struct qemu_sched_attr scha;
++             if (arg2 == 0) {
++                 return -TARGET_EINVAL;
++             }
++@@ -11401,7 +11401,7 @@
++                 target_scha->sched_runtime = tswap64(scha.sched_runtime);
++                 target_scha->sched_deadline = tswap64(scha.sched_deadline);
++                 target_scha->sched_period = tswap64(scha.sched_period);
++-                if (scha.size > offsetof(struct sched_attr, sched_util_min)) {
+++                if (scha.size > offsetof(struct qemu_sched_attr, sched_util_min)) {
++                     target_scha->sched_util_min = tswap32(scha.sched_util_min);
++                     target_scha->sched_util_max = tswap32(scha.sched_util_max);
++                 }
++@@ -11412,7 +11412,7 @@
++     case TARGET_NR_sched_setattr:
++         {
++             struct target_sched_attr *target_scha;
++-            struct sched_attr scha;
+++            struct qemu_sched_attr scha;
++             uint32_t size;
++             int zeroed;
++             if (arg2 == 0) {
+diff --git a/configs/recalbox-q6a_defconfig b/configs/recalbox-q6a_defconfig
+index 69ec703..be0430d 100644
+--- a/configs/recalbox-q6a_defconfig
++++ b/configs/recalbox-q6a_defconfig
+@@ -33,7 +33,7 @@ BR2_PACKAGE_ALSA_UTILS_AMIXER=y
+ BR2_PACKAGE_FLUIDSYNTH_DBUS=y
+ BR2_PACKAGE_X264=y
+ BR2_PACKAGE_X265=y
+-BR2_PACKAGE_KODI=y
++# BR2_PACKAGE_KODI is not set
+ BR2_PACKAGE_KODI_ALSA_LIB=y
+ BR2_PACKAGE_KODI_AVAHI=y
+ BR2_PACKAGE_KODI_BLUEZ=y
+@@ -234,12 +234,12 @@ BR2_PACKAGE_LIBRETRO_DOSBOX_PURE=y
+ BR2_PACKAGE_LIBRETRO_EASYRPG=y
+ BR2_PACKAGE_LIBRETRO_ECWOLF=y
+ BR2_PACKAGE_LIBRETRO_EIGHTYONE=y
+-BR2_PACKAGE_LIBRETRO_EMUSCV=y
++# BR2_PACKAGE_LIBRETRO_EMUSCV is not set
+ BR2_PACKAGE_LIBRETRO_FAKE08=y
+ BR2_PACKAGE_LIBRETRO_FBNEO=y
+ BR2_PACKAGE_LIBRETRO_FCEUMM=y
+-BR2_PACKAGE_LIBRETRO_FLYCAST=y
+-BR2_PACKAGE_LIBRETRO_FLYCAST_NEXT=y
++# BR2_PACKAGE_LIBRETRO_FLYCAST is not set
++# BR2_PACKAGE_LIBRETRO_FLYCAST_NEXT is not set
+ BR2_PACKAGE_LIBRETRO_FMSX=y
+ BR2_PACKAGE_LIBRETRO_FREECHAF=y
+ BR2_PACKAGE_LIBRETRO_FUSE=y
+@@ -264,7 +264,7 @@ BR2_PACKAGE_LIBRETRO_M2000=y
+ BR2_PACKAGE_LIBRETRO_MAME2003_PLUS=y
+ BR2_PACKAGE_LIBRETRO_MAME2003=y
+ BR2_PACKAGE_LIBRETRO_MAME2010=y
+-BR2_PACKAGE_LIBRETRO_MAME2015=y
++# BR2_PACKAGE_LIBRETRO_MAME2015 is not set
+ BR2_PACKAGE_LIBRETRO_MELONDS=y
+ BR2_PACKAGE_LIBRETRO_MESEN=y
+ BR2_PACKAGE_LIBRETRO_MESEN_S=y
+@@ -282,7 +282,7 @@ BR2_PACKAGE_LIBRETRO_NXENGINE=y
+ BR2_PACKAGE_LIBRETRO_O2EM=y
+ BR2_PACKAGE_LIBRETRO_OPERA=y
+ BR2_PACKAGE_LIBRETRO_PARALLEL_N64=y
+-BR2_PACKAGE_LIBRETRO_PCSX_REARMED=y
++# BR2_PACKAGE_LIBRETRO_PCSX_REARMED is not set
+ BR2_PACKAGE_LIBRETRO_PD777=y
+ BR2_PACKAGE_LIBRETRO_PICODRIVE=y
+ BR2_PACKAGE_LIBRETRO_POKEMINI=y
+@@ -321,7 +321,7 @@ BR2_PACKAGE_LIBRETRO_UAE4ARM=y
+ BR2_PACKAGE_LIBRETRO_UZEM=y
+ BR2_PACKAGE_LIBRETRO_VECX=y
+ BR2_PACKAGE_LIBRETRO_VICE=y
+-BR2_PACKAGE_LIBRETRO_VIRCON32=y
++# BR2_PACKAGE_LIBRETRO_VIRCON32 is not set
+ BR2_PACKAGE_LIBRETRO_VITAQUAKE2=y
+ BR2_PACKAGE_LIBRETRO_VIRTUALJAGUAR=y
+ BR2_PACKAGE_LIBRETRO_XMIL=y
+@@ -329,7 +329,7 @@ BR2_PACKAGE_LIBRETRO_XRICK=y
+ BR2_PACKAGE_LIBRETRO_YABASANSHIRO=y
+ BR2_PACKAGE_LIBRETRO_WASM4=y
+ BR2_PACKAGE_JSTEST2=y
+-BR2_PACKAGE_WSD=y
++# BR2_PACKAGE_WSD is not set
+ BR2_PACKAGE_KERNELFIRMWARES=y
+ BR2_PACKAGE_LIBRETRO_CHEATS=y
+ BR2_PACKAGE_UTIL_LINUX_RFKILL=y
+@@ -349,17 +349,17 @@ BR2_PACKAGE_FLUIDSYNTH_PULSEAUDIO=y
+ BR2_PACKAGE_KODI_PULSEAUDIO=y
+ BR2_PACKAGE_PAMIX=y
+ BR2_PACKAGE_RECALBOX_WPAF=y
+-BR2_PACKAGE_XONE=y
+-BR2_PACKAGE_XPAD_NOONE=y
++# BR2_PACKAGE_XONE is not set
++# BR2_PACKAGE_XPAD_NOONE is not set
+ BR2_PACKAGE_RECALBOX_VOLUMED=y
+ BR2_PACKAGE_KMSGRAB=y
+ BR2_PACKAGE_SWITCHRES=y
+ BR2_PACKAGE_FFMPEG_EXTRACONF="--enable-libpulse"
+ BR2_PACKAGE_RTL8189FS=y
+-BR2_PACKAGE_RTL8812AU=y
+-BR2_PACKAGE_RTL88X2BU=y
+-BR2_PACKAGE_RTW89=y
+-BR2_PACKAGE_XPADNEO=y
++# BR2_PACKAGE_RTL8812AU is not set
++# BR2_PACKAGE_RTL88X2BU is not set
++# BR2_PACKAGE_RTW89 is not set
++# BR2_PACKAGE_XPADNEO is not set
+ BR2_PACKAGE_WII_U_GC_ADAPTER=y
+ BR2_PACKAGE_VVVVVV=y
+ BR2_PACKAGE_LIBRETRO_TAMALIBRETRO=y
+diff --git a/package/libretro-amiberry/libretro-amiberry.mk b/package/libretro-amiberry/libretro-amiberry.mk
+index 6c12fdb..21e002c 100644
+--- a/package/libretro-amiberry/libretro-amiberry.mk
++++ b/package/libretro-amiberry/libretro-amiberry.mk
+@@ -21,7 +21,7 @@ LIBRETRO_AMIBERRY_PLATFORM=rpi5_64
+ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RPI4_64),y)
+ LIBRETRO_AMIBERRY_ARCH=aarch64
+ LIBRETRO_AMIBERRY_PLATFORM=rpi4_64
+-else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X),y)
++else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
+ LIBRETRO_AMIBERRY_ARCH=aarch64
+ LIBRETRO_AMIBERRY_PLATFORM=rg353x
+ else
+diff --git a/package/libretro-flycast/libretro-flycast.mk b/package/libretro-flycast/libretro-flycast.mk
+index dafdd63..61868e1 100644
+--- a/package/libretro-flycast/libretro-flycast.mk
++++ b/package/libretro-flycast/libretro-flycast.mk
+@@ -17,7 +17,7 @@ LIBRETRO_FLYCAST_SUPP_OPT += BOARD=ODROID-XU4 CC_AS="$(TARGET_CC)"
+ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDGO2),y)
+ LIBRETRO_FLYCAST_PLATFORM = odroid-go2
+ LIBRETRO_FLYCAST_SUPP_OPT += CC_AS="$(TARGET_CC)"
+-else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X),y)
++else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
+ LIBRETRO_FLYCAST_PLATFORM = arm64
+ LIBRETRO_FLYCAST_SUPP_OPT += CC_AS="$(TARGET_CC)"
+ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RPIZERO2LEGACY),y)
+diff --git a/package/libretro-mupen64plus-nx/libretro-mupen64plus-nx.mk b/package/libretro-mupen64plus-nx/libretro-mupen64plus-nx.mk
+index e0f98b2..a6f9915 100644
+--- a/package/libretro-mupen64plus-nx/libretro-mupen64plus-nx.mk
++++ b/package/libretro-mupen64plus-nx/libretro-mupen64plus-nx.mk
+@@ -38,7 +38,7 @@ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDGO2),y)
+ LIBRETRO_MUPEN64PLUS_NX_PLATFORM=odroid64
+ LIBRETRO_MUPEN64PLUS_NX_SUPP_OPT=BOARD="ODROID-GO2"
+ 
+-else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X),y)
++else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
+ LIBRETRO_MUPEN64PLUS_NX_PLATFORM=unix
+ 
+ else ifeq ($(BR2_x86_64),y)
+diff --git a/package/libretro-parallel-n64/libretro-parallel-n64.mk b/package/libretro-parallel-n64/libretro-parallel-n64.mk
+index fe344b5..bbbcea4 100644
+--- a/package/libretro-parallel-n64/libretro-parallel-n64.mk
++++ b/package/libretro-parallel-n64/libretro-parallel-n64.mk
+@@ -56,7 +56,7 @@ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDGO2),y)
+ LIBRETRO_PARALLEL_N64_PLATFORM = odroid
+ LIBRETRO_PARALLEL_N64_SUPP_OPT = BOARD=ODROIDGO2 HAVE_PARELLEL_RSP=1
+ 
+-else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X),y)
++else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
+ #LIBRETRO_PARALLEL_N64_PLATFORM = unix gles
+ #LIBRETRO_PARALLEL_N64_SUPP_OPT = HAVE_PARALLEL=1 LIBS=-lmali CPUFLAGS="-DCLASSIC -DARM64 -DARM_FIX"
+ LIBRETRO_PARALLEL_N64_PLATFORM = odroid
+diff --git a/package/libretro-pcsx_rearmed/libretro-pcsx_rearmed.mk b/package/libretro-pcsx_rearmed/libretro-pcsx_rearmed.mk
+index 91d51df..06becfc 100644
+--- a/package/libretro-pcsx_rearmed/libretro-pcsx_rearmed.mk
++++ b/package/libretro-pcsx_rearmed/libretro-pcsx_rearmed.mk
+@@ -20,7 +20,7 @@ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDGO2),y)
+ LIBRETRO_PCSX_REARMED_PLATFORM=odroidgo2
+ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDXU4),y)
+ LIBRETRO_PCSX_REARMED_PLATFORM=armv7 odroidxu4 neon
+-else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X),y)
++else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
+ LIBRETRO_PCSX_REARMED_PLATFORM=arm64
+ LIBRETRO_PCSX_REARMED_OPTS= CPUFLAGS="-march=armv8-a -mtune=cortex-a55"
+ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_X86_64),y)
+diff --git a/package/libretro-scummvm/libretro-scummvm.mk b/package/libretro-scummvm/libretro-scummvm.mk
+index e2b33dd..cfd4b49 100644
+--- a/package/libretro-scummvm/libretro-scummvm.mk
++++ b/package/libretro-scummvm/libretro-scummvm.mk
+@@ -41,7 +41,7 @@ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RPI3)$(BR2_PACKAGE_RECALBOX_TARGET_RPIZ
+ LIBRETRO_SCUMMVM_PLATFORM=rpi3
+ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDGO2),y)
+ LIBRETRO_SCUMMVM_PLATFORM=odroidgo2
+-else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X),y)
++else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
+ LIBRETRO_SCUMMVM_PLATFORM=rg353x
+ else
+ LIBRETRO_SCUMMVM_PLATFORM = $(RETROARCH_LIBRETRO_PLATFORM)
+diff --git a/package/libretro-supafaust/libretro-supafaust.mk b/package/libretro-supafaust/libretro-supafaust.mk
+index b8e5b1d..cd95d85 100644
+--- a/package/libretro-supafaust/libretro-supafaust.mk
++++ b/package/libretro-supafaust/libretro-supafaust.mk
+@@ -10,7 +10,7 @@ LIBRETRO_SUPAFAUST_SITE = $(call github,libretro,supafaust,$(LIBRETRO_SUPAFAUST_
+ LIBRETRO_SUPAFAUST_LICENSE = GPL-2.0
+ LIBRETRO_SUPAFAUST_LICENSE_FILES = COPYING
+ 
+-ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDXU4)$(BR2_PACKAGE_RECALBOX_TARGET_ODROIDGO2)$(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_X86_64),y)
++ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDXU4)$(BR2_PACKAGE_RECALBOX_TARGET_ODROIDGO2)$(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_Q6A)$(BR2_PACKAGE_RECALBOX_TARGET_X86_64),y)
+ LIBRETRO_SUPAFAUST_PLATFORM=unix
+ else
+ LIBRETRO_SUPAFAUST_PLATFORM=$(RECALBOX_SYSTEM_PLATFORM)
+diff --git a/package/libretro-tamalibretro/libretro-tamalibretro.mk b/package/libretro-tamalibretro/libretro-tamalibretro.mk
+index 3abbee1..acb994a 100644
+--- a/package/libretro-tamalibretro/libretro-tamalibretro.mk
++++ b/package/libretro-tamalibretro/libretro-tamalibretro.mk
+@@ -20,7 +20,7 @@ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RPI5_64),y)
+ LIBRETRO_TAMALIBRETRO_PLATFORM=unix-rpi5
+ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDGO2),y)
+ LIBRETRO_TAMALIBRETRO_PLATFORM=unix-ogo2
+-else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X),y)
++else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
+ LIBRETRO_TAMALIBRETRO_PLATFORM=unix-rg353x
+ else
+ LIBRETRO_TAMALIBRETRO_PLATFORM=unix
+diff --git a/package/libretro-yabasanshiro/libretro-yabasanshiro.mk b/package/libretro-yabasanshiro/libretro-yabasanshiro.mk
+index 5409dca..8078f1c 100644
+--- a/package/libretro-yabasanshiro/libretro-yabasanshiro.mk
++++ b/package/libretro-yabasanshiro/libretro-yabasanshiro.mk
+@@ -25,7 +25,7 @@ LIBRETRO_YABASANSHIRO_SUPP_OPT=BOARD="ODROID-XU4"
+ else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_ODROIDGO2),y)
+ LIBRETRO_YABASANSHIRO_PLATFORM=odroid-go2
+ LIBRETRO_YABASANSHIRO_LDFLAGS_OPT = -lpthread
+-else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X),y)
++else ifeq ($(BR2_PACKAGE_RECALBOX_TARGET_RG353X)$(BR2_PACKAGE_RECALBOX_TARGET_Q6A),y)
+ LIBRETRO_YABASANSHIRO_PLATFORM=arm64
+ LIBRETRO_YABASANSHIRO_SUPP_OPT = FORCE_GLES=1
+ LIBRETRO_YABASANSHIRO_LDFLAGS_OPT = -lpthread
+-- 
+2.53.0
+
