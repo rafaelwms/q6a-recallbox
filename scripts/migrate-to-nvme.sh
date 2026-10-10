@@ -36,7 +36,7 @@ case "$BOOTDEV" in "$DISK"*) die "Recalbox is running from $DISK; boot it from t
 LAST=$(sgdisk -p "$DISK" | awk '/^ +[0-9]+ /{n=$1} END{print n}')
 [ "$LAST" = "$PART" ] || die "partition $PART is not the last on $DISK (last is $LAST)"
 sgdisk -i "$PART" "$DISK" | grep -q "0FC63DAF-8483-4772-8E79-3D69D8477DE4" || die "partition $PART is not a Linux filesystem"
-TYPE=$(blkid -o value -s TYPE "${P}${PART}")
+TYPE=$(blkid "${P}${PART}" | sed -n 's/.*TYPE="\([^"]*\)".*/\1/p')   # BusyBox blkid has no -o/-s
 [ "$TYPE" = ext4 ] || die "partition $PART is $TYPE, expected ext4"
 
 START=$(sgdisk -i "$PART" "$DISK" | awk '/First sector/{print $3}')
