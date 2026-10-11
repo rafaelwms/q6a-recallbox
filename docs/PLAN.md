@@ -76,3 +76,8 @@ Result: first boot from the NVMe worked on the first try. S11share created p6 SH
 /boot = nvme0n1p5, share = p6; wlan0, hci0 and the sound card are present; no I/O errors in dmesg. Note: after the very first boot
 /overlay is still a tmpfs - reboot once so the OVERLAY partition is used. Settings (Wi-Fi, Bluetooth pairings, recalbox.conf) live in
 the share, so a fresh install starts with defaults; copy `share/system` from the old install to keep them.
+
+### 2026-10-10 - Hardware test of the shipped image (maintainer)
+Every emulator and PC port included in the image was opened and ran on the board; PS1 and Dreamcast were tested in particular with
+games copied from an R36S card. Exhaustive per-game compatibility and performance benchmarks are still not done.
+Still not in the image: Kodi, vircon32, flycast-next, wsd.

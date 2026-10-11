@@ -14,8 +14,7 @@ Built from upstream Recalbox `master` (commit `27224c1`) plus the patch series i
 | Audio | ✅ HDMI and 3.5 mm headphone jack |
 | Wi-Fi + Bluetooth | ✅ onboard AIC8800 (audio devices and gamepads) |
 | GPU | Mesa Freedreno (OpenGL ES) |
-| Emulators confirmed on hardware | NES, **PS1** (`pcsx_rearmed`), **Dreamcast** (`flycast`) |
-| Other cores | N64, MAME 2015, etc. build and load; performance not benchmarked yet |
+| Emulators and PC ports | ✅ every emulator and PC port included in the image was opened and run on real hardware by the maintainer; **PS1** (`pcsx_rearmed`) and **Dreamcast** (`flycast`) were tested in particular |
 
 Default SSH login: user `root`, password `recalboxroot` — **change it** in `recalbox.conf`. The `SHARE` and `OVERLAY` partitions are created on the first boot, in the free space of the disk.
 
@@ -77,8 +76,7 @@ Construída a partir do Recalbox oficial `master` (commit `27224c1`) mais a sér
 | Áudio | ✅ HDMI e conector de fone 3,5 mm |
 | Wi-Fi + Bluetooth | ✅ AIC8800 onboard (dispositivos de áudio e controles) |
 | GPU | Mesa Freedreno (OpenGL ES) |
-| Emuladores confirmados no hardware | NES, **PS1** (`pcsx_rearmed`), **Dreamcast** (`flycast`) |
-| Outros núcleos | N64, MAME 2015 etc. compilam e carregam; desempenho ainda não medido |
+| Emuladores e ports de PC | ✅ todos os emuladores e ports de PC incluídos na imagem foram abertos e executados no hardware real pelo mantenedor; **PS1** (`pcsx_rearmed`) e **Dreamcast** (`flycast`) foram testados com atenção especial |
 
 Login SSH padrão: usuário `root`, senha `recalboxroot` — **troque** no `recalbox.conf`. As partições `SHARE` e `OVERLAY` são criadas no primeiro boot, no espaço livre do disco.
 

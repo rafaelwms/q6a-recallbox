@@ -25,8 +25,7 @@ hardware recipe (firmware, audio UCM, AIC8800 Wi-Fi/BT).
 | Bluetooth: speakers/headphones and gamepads | ✅ |
 | USB gamepads, keyboard, mouse | ✅ |
 | Gigabit Ethernet | ✅ |
-| Tested emulators | NES, **PS1** (`pcsx_rearmed`), **Dreamcast** (`flycast`) |
-| Other cores (N64, MAME 2015, ...) | build and load; performance not benchmarked yet |
+| Emulators and PC ports included in the image | ✅ all opened and run on real hardware; **PS1** (`pcsx_rearmed`) and **Dreamcast** (`flycast`) tested in particular |
 
 ### Known limitations
 
@@ -130,8 +129,7 @@ The build downloads Radxa's firmware packages ([radxa-pkg](https://github.com/ra
 | Bluetooth: caixas/fones e controles | ✅ |
 | Controles USB, teclado, mouse | ✅ |
 | Ethernet Gigabit | ✅ |
-| Emuladores testados | NES, **PS1** (`pcsx_rearmed`), **Dreamcast** (`flycast`) |
-| Outros núcleos (N64, MAME 2015, ...) | compilam e carregam; desempenho ainda não medido |
+| Emuladores e ports de PC incluídos na imagem | ✅ todos abertos e executados no hardware real; **PS1** (`pcsx_rearmed`) e **Dreamcast** (`flycast`) testados com atenção especial |
 
 ### Limitações conhecidas
 
