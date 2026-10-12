@@ -81,3 +81,11 @@ the share, so a fresh install starts with defaults; copy `share/system` from the
 Every emulator and PC port included in the image was opened and ran on the board; PS1 and Dreamcast were tested in particular with
 games copied from an R36S card. Exhaustive per-game compatibility and performance benchmarks are still not done.
 Still not in the image: Kodi, vircon32, flycast-next, wsd.
+
+### 2026-10-12 - v0.1.1 prepared
+v0.1.0 (published 2026-10-11) shipped the earlier image: 4K30 as the default mode on 4K TVs (half-speed 60 fps games and wobbling audio),
+VERSION `development`, BOARD `unknown`, an audio.device inherited from the Raspberry Pi and official updates enabled.
+v0.1.1: kernel filters exposed HDMI modes (msm.dp_max_width/height, dp_hires_max_refresh, dp_min_refresh), ES shows the device tree model
+for unknown boards, version 0.1.1, safer conf defaults, optional governor/run-ahead/reduce-latency settings. The assets live in
+release/v0.1.1/ (git-ignored): 1.4 GB part00 + 321.7 MB part01 + SHA256SUMS. Not published yet.
+Open: ES gamelist hang when opening some games (netconsole capture helper worked; no reproduction captured yet); optional update channel.

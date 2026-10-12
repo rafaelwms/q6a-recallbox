@@ -1,7 +1,7 @@
 From ee5030e39ba998b0ea9fe316fc109e4eac612387 Mon Sep 17 00:00:00 2001
 From: Rafael WMS <rafael.wms@live.com>
 Date: Mon, 12 Oct 2026 00:04:07 -0300
-Subject: [PATCH 6/6] feat(q6a): limit exposed video modes (kernel), ES board
+Subject: [PATCH 6/7] feat(q6a): limit exposed video modes (kernel), ES board
  name from device tree, version 0.1.0, safer defaults
 
 ---

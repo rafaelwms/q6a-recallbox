@@ -1,7 +1,7 @@
 From f0698d5e6b4aa1662424f210390816e3d1d883b5 Mon Sep 17 00:00:00 2001
 From: Rafael WMS <rafael.wms@live.com>
 Date: Sat, 10 Oct 2026 16:04:06 -0300
-Subject: [PATCH 3/6] fix(q6a): build FAT/squashfs/overlayfs/USB path into the
+Subject: [PATCH 3/7] fix(q6a): build FAT/squashfs/overlayfs/USB path into the
  kernel
 
 ---

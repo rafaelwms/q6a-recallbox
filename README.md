@@ -29,14 +29,36 @@ hardware recipe (firmware, audio UCM, AIC8800 Wi-Fi/BT).
 
 ### Known limitations
 
-- **Video is limited to 4K@30 Hz** by the board's HDMI output ([Radxa specs](https://docs.radxa.com/en/dragon/q6a)). On a
-  4K/120 Hz TV or monitor, set the global video mode to **1080p at the highest refresh rate** your display supports
-  (*Menu → System settings → Video*; e.g. 1080p120). Tested on a QHD 144 Hz monitor and on a 4K 120 Hz TV at 1080p120.
+- **The HDMI output is limited to 4K@30 Hz** by the hardware ([Radxa specs](https://docs.radxa.com/en/dragon/q6a)). A 4K TV
+  that advertises 4K as its preferred mode used to make Recalbox pick it, halving the speed of 60 fps games (slow motion and
+  wobbling audio). Since v0.1.1 the kernel **hides modes above 1440p, modes wider than 1080p above 60 Hz, and modes below 50 Hz**,
+  and the default video mode is 1080p. See [Display modes](#display-modes-and-tuning) to change the limits.
 - A few seconds of white screen at boot, while the GPU firmware loads. Cosmetic.
 - Not included yet: Kodi, Vulkan (Turnip is not in this Buildroot), and a few minor cores (`vircon32`, `flycast-next`).
 - Power: the board can brown out under heavy NVMe + USB load. Use a good USB-C PD supply.
 
 See [docs/PLAN.md](docs/PLAN.md) for the full status log, the dead ends and the roadmap.
+
+### Display modes and tuning
+
+The kernel limits the modes the HDMI output exposes (so the board never ends up at 4K@30 by accident). The limits are kernel
+parameters; to change them edit `grub.cfg` on the boot partition (the `RECALBOX` FAT partition, `boot/grub/grub.cfg`) and add them
+to the `linux` line:
+
+| Parameter | Default | Meaning |
+|---|---|---|
+| `msm.dp_max_width` / `msm.dp_max_height` | 2560 / 1440 | hide larger modes (0 = no limit) |
+| `msm.dp_hires_max_refresh` | 60 | hide modes wider than 1920 above this refresh rate |
+| `msm.dp_min_refresh` | 50 | hide modes of 1280 pixels or more below this refresh rate (24/25/30 Hz) |
+
+Set `global.videomode` (and `system.es.videomode`) in `recalbox.conf`, or use *Menu → System settings → Video*. Other options in
+`recalbox.conf` (commented out by default):
+
+- `system.cpu.governor=performance` keeps the CPU at full speed: steadier frame times and less input jitter, a bit more power and heat.
+- `global.runahead=1` and `global.reducelatency=1` lower input latency on 8/16-bit systems (NES, SNES, Mega Drive, Master System,
+  Game Boy, Game Gear, FBNeo). If your TV has a game mode (ALLM / "Game Optimizer"), turn it on: it is the biggest single factor.
+- Official Recalbox updates are **disabled** (`updates.enabled=0`): they would install an image that does not run on this board.
+  Update by flashing a new release, or by replacing `boot/linux`, `boot/initrd.gz` and `boot/recalbox` on the boot partition.
 
 ### Install a pre-built image
 
@@ -133,14 +155,36 @@ The build downloads Radxa's firmware packages ([radxa-pkg](https://github.com/ra
 
 ### Limitações conhecidas
 
-- **O vídeo é limitado a 4K@30 Hz** pela saída HDMI da placa ([especificações da Radxa](https://docs.radxa.com/en/dragon/q6a)). Numa
-  TV ou monitor 4K/120 Hz, ajuste o modo de vídeo global para **1080p na maior taxa de atualização** que o seu display suporta
-  (*Menu → Configurações do sistema → Vídeo*; por ex. 1080p120). Testado num monitor QHD 144 Hz e numa TV 4K 120 Hz a 1080p120.
+- **A saída HDMI é limitada a 4K@30 Hz** pelo hardware ([especificações da Radxa](https://docs.radxa.com/en/dragon/q6a)). Uma TV 4K
+  que anuncia o 4K como modo preferido fazia o Recalbox escolhê-lo, deixando os jogos de 60 fps na metade da velocidade (câmera
+  lenta e áudio oscilando). Desde a v0.1.1 o kernel **esconde modos acima de 1440p, modos mais largos que 1080p acima de 60 Hz e
+  modos abaixo de 50 Hz**, e o modo de vídeo padrão é 1080p. Veja [Modos de vídeo](#modos-de-vídeo-e-ajustes) para mudar os limites.
 - Alguns segundos de tela branca no boot, enquanto o firmware da GPU carrega. Só estético.
 - Ainda não incluídos: Kodi, Vulkan (o Turnip não existe neste Buildroot) e alguns núcleos menores (`vircon32`, `flycast-next`).
 - Energia: a placa pode ter queda de tensão sob carga pesada de NVMe + USB. Use uma boa fonte USB-C PD.
 
 Veja o [docs/PLAN.md](docs/PLAN.md) para o registro completo, os becos sem saída e o roteiro (em inglês).
+
+### Modos de vídeo e ajustes
+
+O kernel limita os modos que a saída HDMI expõe (assim a placa nunca cai no 4K@30 por acidente). Os limites são parâmetros do
+kernel; para mudá-los, edite o `grub.cfg` da partição de boot (a partição FAT `RECALBOX`, `boot/grub/grub.cfg`) e acrescente à
+linha `linux`:
+
+| Parâmetro | Padrão | Significado |
+|---|---|---|
+| `msm.dp_max_width` / `msm.dp_max_height` | 2560 / 1440 | esconde modos maiores (0 = sem limite) |
+| `msm.dp_hires_max_refresh` | 60 | esconde modos mais largos que 1920 acima dessa taxa de atualização |
+| `msm.dp_min_refresh` | 50 | esconde modos de 1280 pixels ou mais abaixo dessa taxa (24/25/30 Hz) |
+
+Defina `global.videomode` (e `system.es.videomode`) no `recalbox.conf`, ou use *Menu → Configurações do sistema → Vídeo*. Outras
+opções do `recalbox.conf` (comentadas por padrão):
+
+- `system.cpu.governor=performance` mantém a CPU em velocidade máxima: tempos de quadro mais estáveis e menos variação na entrada, com um pouco mais de consumo e calor.
+- `global.runahead=1` e `global.reducelatency=1` reduzem a latência de entrada em sistemas de 8/16 bits (NES, SNES, Mega Drive,
+  Master System, Game Boy, Game Gear, FBNeo). Se a sua TV tem modo jogo (ALLM / "Game Optimizer"), ligue: é o fator mais importante.
+- As atualizações oficiais do Recalbox ficam **desligadas** (`updates.enabled=0`): instalariam uma imagem que não roda nesta placa.
+  Atualize gravando uma nova release, ou trocando `boot/linux`, `boot/initrd.gz` e `boot/recalbox` na partição de boot.
 
 ### Instalar uma imagem pronta
 
