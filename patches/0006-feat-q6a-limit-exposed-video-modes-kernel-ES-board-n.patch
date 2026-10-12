@@ -1,0 +1,191 @@
+From ee5030e39ba998b0ea9fe316fc109e4eac612387 Mon Sep 17 00:00:00 2001
+From: Rafael WMS <rafael.wms@live.com>
+Date: Mon, 12 Oct 2026 00:04:07 -0300
+Subject: [PATCH 6/6] feat(q6a): limit exposed video modes (kernel), ES board
+ name from device tree, version 0.1.0, safer defaults
+
+---
+ .../q6a/fsoverlay/etc/init.d/S13cpugovernor   | 19 +++++++
+ .../q6a/fsoverlay/recalbox/recalbox.version   |  1 +
+ .../0001-drm-msm-dp-limit-exposed-modes.patch | 55 +++++++++++++++++++
+ package/recalbox-system/q6a/recalbox.conf     | 18 ++++--
+ .../frontend/es-core/src/hardware/Board.cpp   | 13 ++++-
+ 5 files changed, 101 insertions(+), 5 deletions(-)
+ create mode 100755 board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S13cpugovernor
+ create mode 100644 board/recalbox/qualcomm/q6a/fsoverlay/recalbox/recalbox.version
+ create mode 100644 board/recalbox/qualcomm/q6a/kernel_patches/0001-drm-msm-dp-limit-exposed-modes.patch
+
+diff --git a/board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S13cpugovernor b/board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S13cpugovernor
+new file mode 100755
+index 0000000..e20f40c
+--- /dev/null
++++ b/board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S13cpugovernor
+@@ -0,0 +1,19 @@
++#!/bin/sh
++# Apply the CPU frequency governor chosen in recalbox.conf (system.cpu.governor).
++# Runs after S11share (the share partition holds recalbox.conf). Without the key, the kernel default is kept.
++CONF=/recalbox/share/system/recalbox.conf
++case "$1" in
++  start)
++    gov=$(sed -n 's/^system\.cpu\.governor=//p' "$CONF" 2>/dev/null | tail -n 1 | tr -d ' \r')
++    [ -n "$gov" ] || exit 0
++    for p in /sys/devices/system/cpu/cpufreq/policy*; do
++      [ -w "$p/scaling_governor" ] || continue
++      if grep -qw "$gov" "$p/scaling_available_governors" 2>/dev/null; then
++        echo "$gov" > "$p/scaling_governor"
++      fi
++    done
++    ;;
++  stop|restart|reload|status) ;;
++  *) echo "Usage: $0 {start}" >&2; exit 1 ;;
++esac
++exit 0
+diff --git a/board/recalbox/qualcomm/q6a/fsoverlay/recalbox/recalbox.version b/board/recalbox/qualcomm/q6a/fsoverlay/recalbox/recalbox.version
+new file mode 100644
+index 0000000..6e8bf73
+--- /dev/null
++++ b/board/recalbox/qualcomm/q6a/fsoverlay/recalbox/recalbox.version
+@@ -0,0 +1 @@
++0.1.0
+diff --git a/board/recalbox/qualcomm/q6a/kernel_patches/0001-drm-msm-dp-limit-exposed-modes.patch b/board/recalbox/qualcomm/q6a/kernel_patches/0001-drm-msm-dp-limit-exposed-modes.patch
+new file mode 100644
+index 0000000..af1de73
+--- /dev/null
++++ b/board/recalbox/qualcomm/q6a/kernel_patches/0001-drm-msm-dp-limit-exposed-modes.patch
+@@ -0,0 +1,55 @@
++drm/msm/dp: let the platform limit the exposed modes
++
++Add kernel parameters (msm.dp_max_width, dp_max_height, dp_hires_max_refresh, dp_min_refresh) that hide modes
++the board cannot drive well, e.g. 4K@30 advertised as preferred by 4K TVs on the Radxa Dragon Q6A.
++
++--- a/drivers/gpu/drm/msm/dp/dp_display.c	2026-10-11 23:36:11.675505414 -0300
+++++ b/drivers/gpu/drm/msm/dp/dp_display.c	2026-10-11 23:36:11.675542277 -0300
++@@ -681,6 +681,27 @@
++ 	return 0;
++ }
++ 
+++/*
+++ * Limits on the modes exposed on the DP/HDMI output. The Radxa Dragon Q6A HDMI output tops out at 4K@30, and a TV that
+++ * advertises 4K as its preferred mode makes userspace pick it, which halves the speed of 60 fps content. These are
+++ * kernel command line parameters (msm.dp_max_width=..., etc.); 0 disables a limit.
+++ */
+++static int dp_max_width = 2560;
+++module_param(dp_max_width, int, 0644);
+++MODULE_PARM_DESC(dp_max_width, "Hide modes wider than this many pixels (default 2560, 0 = no limit)");
+++
+++static int dp_max_height = 1440;
+++module_param(dp_max_height, int, 0644);
+++MODULE_PARM_DESC(dp_max_height, "Hide modes taller than this many lines (default 1440, 0 = no limit)");
+++
+++static int dp_hires_max_refresh = 60;
+++module_param(dp_hires_max_refresh, int, 0644);
+++MODULE_PARM_DESC(dp_hires_max_refresh, "Hide modes wider than 1920 pixels with a higher refresh rate (default 60, 0 = no limit)");
+++
+++static int dp_min_refresh = 50;
+++module_param(dp_min_refresh, int, 0644);
+++MODULE_PARM_DESC(dp_min_refresh, "Hide modes of 1280 pixels or more with a lower refresh rate, i.e. 24/25/30 Hz (default 50, 0 = no limit)");
+++
++ /**
++  * msm_dp_bridge_mode_valid - callback to determine if specified mode is valid
++  * @bridge: Pointer to drm bridge structure
++@@ -708,6 +729,19 @@
++ 		return -EINVAL;
++ 	}
++ 
+++	if (dp_max_width && mode->hdisplay > dp_max_width)
+++		return MODE_BAD_HVALUE;
+++	if (dp_max_height && mode->vdisplay > dp_max_height)
+++		return MODE_BAD_VVALUE;
+++	if (mode->hdisplay >= 1280) {
+++		int vrefresh = drm_mode_vrefresh(mode);
+++
+++		if (dp_min_refresh && vrefresh < dp_min_refresh)
+++			return MODE_BAD;
+++		if (dp_hires_max_refresh && mode->hdisplay > 1920 && vrefresh > dp_hires_max_refresh)
+++			return MODE_BAD;
+++	}
+++
++ 	msm_dp_display = container_of(dp, struct msm_dp_display_private, msm_dp_display);
++ 	link_info = &msm_dp_display->panel->link_info;
++ 
+diff --git a/package/recalbox-system/q6a/recalbox.conf b/package/recalbox-system/q6a/recalbox.conf
+index d89d9ec..d2d3a17 100644
+--- a/package/recalbox-system/q6a/recalbox.conf
++++ b/package/recalbox-system/q6a/recalbox.conf
+@@ -51,7 +51,7 @@ system.api.enabled=0
+ 
+ ## Allow a specific resolution for ES only
+ ## Leave commented for the default usual behaviour
+-;system.es.videomode=1280x720
++system.es.videomode=1920x1080
+ 
+ ## Root password
+ ## For setting your own password use the command below
+@@ -223,7 +223,7 @@ system.ssh.enabled=1
+ 
+ # ------------ C - Audio ------------ #
+ ## Set the audio device (auto, hdmi, jack)
+-audio.device=alsa_card.1:hdmi-output-0
++audio.device=alsa_card.0:[Out] HDMI:HiFi
+ ## Set system volume (0..100)
+ audio.volume=90
+ ## Set music volume (0..100)
+@@ -329,7 +329,7 @@ system.language=en_US
+ 
+ # ------------ F - UPDATES ------------ #
+ ## Automatically check for updates at start (0,1)
+-updates.enabled=1
++updates.enabled=0
+ # Update type : default to stable
+ updates.type=stable
+ 
+@@ -343,7 +343,7 @@ updates.type=stable
+ ## use 'default' for using the default resolution
+ ## use 'auto' : switches to 1280x720 if supported, else keep the current resolution
+ ## (string)
+-global.videomode=default
++global.videomode=1920x1080
+ 
+ ## Shader set
+ ## Automatically select shaders for all systems
+@@ -561,3 +561,13 @@ global.netplay.lobby=http://lobby.libretro.com/list/
+ 240ptestsuite.ignore=1
+ 
+ ## Configurations generated by Recalbox
++
++## CPU frequency governor (Dragon Q6A). Leave commented to keep the kernel default (ondemand).
++## 'performance' keeps the CPU at full speed: lower and steadier frame times for emulators, a bit more power and heat.
++## Other values: schedutil, ondemand, powersave
++;system.cpu.governor=performance
++
++## Low-latency options for 8/16-bit systems (NES, SNES, Mega Drive, Master System, Game Boy, Game Gear, FBNeo)
++## runahead: emulate one frame ahead to hide the game's own input delay; reducelatency: shorter video queue
++;global.runahead=1
++;global.reducelatency=1
+diff --git a/projects/frontend/es-core/src/hardware/Board.cpp b/projects/frontend/es-core/src/hardware/Board.cpp
+index 37f238f..3bd6f30 100644
+--- a/projects/frontend/es-core/src/hardware/Board.cpp
++++ b/projects/frontend/es-core/src/hardware/Board.cpp
+@@ -307,7 +307,18 @@ String Board::GetBoardName()
+   switch(Board::Instance().GetBoardType())
+   {
+     case BoardType::UndetectedYet:        arch = "undetected"; break;
+-    case BoardType::Unknown:              arch = "unknown"; break;
++    case BoardType::Unknown:
++    {
++      // Hardware not known by Recalbox: show the device tree model (e.g. "Radxa Dragon Q6A") instead of "unknown"
++      static String model;
++      if (model.empty())
++      {
++        String raw = Files::LoadFile(Path("/sys/firmware/devicetree/base/model"));
++        model = String(raw.c_str()).Trim(" \t\r\n"); // the device tree string is NUL-terminated
++      }
++      arch = model.empty() ? String("unknown") : model;
++      break;
++    }
+     case BoardType::Pi0:                  arch = "RPi zero"; break;
+     case BoardType::Pi02:                 arch = "RPi zero 2"; break;
+     case BoardType::Pi1:                  arch = "RPi 1"; break;
+-- 
+2.53.0
+

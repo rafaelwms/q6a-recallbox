@@ -1,7 +1,7 @@
 From c03e5bc0d2fae7f65a49255d5987f9636bdacb22 Mon Sep 17 00:00:00 2001
 From: Rafael WMS <rafael.wms@live.com>
 Date: Sat, 10 Oct 2026 16:47:27 -0300
-Subject: [PATCH 4/4] feat(q6a): firmware (DSP/audio/UCM/AIC8800) and AIC8800
+Subject: [PATCH 4/6] feat(q6a): firmware (DSP/audio/UCM/AIC8800) and AIC8800
  Wi-Fi/BT driver packages
 
 ---
