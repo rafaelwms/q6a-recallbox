@@ -89,3 +89,14 @@ v0.1.1: kernel filters exposed HDMI modes (msm.dp_max_width/height, dp_hires_max
 for unknown boards, version 0.1.1, safer conf defaults, optional governor/run-ahead/reduce-latency settings. The assets live in
 release/v0.1.1/ (git-ignored): 1.4 GB part00 + 321.7 MB part01 + SHA256SUMS. Not published yet.
 Open: ES gamelist hang when opening some games (netconsole capture helper worked; no reproduction captured yet); optional update channel.
+
+### 2026-10-19 - Root cause of the "game freezes on its first frame" bug
+Captured live (persistent kernel log + heartbeat from custom.sh). RetroArch (MAME2003+) alive, ~1 s of CPU in 3+ minutes, all threads on futex, PulseAudio
+`threaded-ml` in poll; the PulseAudio HDMI sink was RUNNING with the RetroArch stream attached; the kernel logged at the same second
+`qcom-apm: DSP returned error[1001002]`, `Failed to start APM port 104`, `ASoC error (-22) at soc_dai_trigger() on DISPLAY_PORT_RX_0`
+(`MultiMedia2 Playback: trigger FE cmd: 1 failed`). Nothing consumes the audio, the emulator blocks on it. `pactl suspend-sink <HDMI>`
+1 then 0 re-triggers the port and the game resumed immediately (CPU 164 -> 260 -> 329 ticks). The same error was behind the ES freeze of 2026-10-11.
+Earlier ES log signatures (12-13 Oct): after "Start in-game Hardware processes" the game exit never completes (no "Stop in-game", no "No error running").
+Fix: extras/q6a-audiofix.sh (reads /dev/kmsg, cycles the HDMI sink, max 5 tries/min), installed on the board via custom.sh, to be shipped in the image
+(fsoverlay init script) in the next release. Root cause (why the DSP port start fails, probably a DP audio / modeset race) is still open: candidates are
+a kernel/driver fix or starting audio after the modeset.

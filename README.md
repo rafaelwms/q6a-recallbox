@@ -34,6 +34,11 @@ hardware recipe (firmware, audio UCM, AIC8800 Wi-Fi/BT).
   wobbling audio). Since v0.1.1 the kernel **hides modes above 1440p, modes wider than 1080p above 60 Hz, and modes below 50 Hz**,
   and the default video mode is 1080p. See [Display modes](#display-modes-and-tuning) to change the limits.
 - A few seconds of white screen at boot, while the GPU firmware loads. Cosmetic.
+- **A game can freeze on its very first frame** (for example the MAME "Copyright Warning" screen) with no CPU use. Cause: sometimes the
+  audio DSP fails to start the HDMI audio port (kernel: `Failed to start APM port 104 ... DISPLAY_PORT_RX_0`); PulseAudio still reports the
+  sink as running, nothing consumes the audio and the emulator waits for it forever. Cycling the sink (`pactl suspend-sink <HDMI sink> 1`,
+  then `0`) makes it resume instantly. [`extras/q6a-audiofix.sh`](extras/q6a-audiofix.sh) does this automatically, see
+  [Troubleshooting](#troubleshooting). It will be built into the next release.
 - Not included yet: Kodi, Vulkan (Turnip is not in this Buildroot), and a few minor cores (`vircon32`, `flycast-next`).
 - Power: the board can brown out under heavy NVMe + USB load. Use a good USB-C PD supply.
 
@@ -59,6 +64,14 @@ Set `global.videomode` (and `system.es.videomode`) in `recalbox.conf`, or use *M
   Game Boy, Game Gear, FBNeo). If your TV has a game mode (ALLM / "Game Optimizer"), turn it on: it is the biggest single factor.
 - Official Recalbox updates are **disabled** (`updates.enabled=0`): they would install an image that does not run on this board.
   Update by flashing a new release, or by replacing `boot/linux`, `boot/initrd.gz` and `boot/recalbox` on the boot partition.
+
+### Troubleshooting
+
+**A game freezes on its first frame / the frontend hangs after leaving a game.** Install the self-heal watcher (no rebuild needed). From a
+computer, copy the two files in [`extras/`](extras) to `/recalbox/share/system/` on the board (SSH `root`, or the `share` network share), as
+`q6a-audiofix.sh` and `custom.sh` (rename `q6a-diag-custom.sh`; if you already have a `custom.sh`, just add its `bash /recalbox/share/system/q6a-audiofix.sh &` line),
+then reboot. `custom.sh` also keeps a kernel log and a 5-second heartbeat in `/recalbox/share/system/logs/q6a-kernel.log` (current boot and the two previous ones):
+please attach it when reporting a bug.
 
 ### Install a pre-built image
 
@@ -160,6 +173,11 @@ The build downloads Radxa's firmware packages ([radxa-pkg](https://github.com/ra
   lenta e áudio oscilando). Desde a v0.1.1 o kernel **esconde modos acima de 1440p, modos mais largos que 1080p acima de 60 Hz e
   modos abaixo de 50 Hz**, e o modo de vídeo padrão é 1080p. Veja [Modos de vídeo](#modos-de-vídeo-e-ajustes) para mudar os limites.
 - Alguns segundos de tela branca no boot, enquanto o firmware da GPU carrega. Só estético.
+- **Um jogo pode congelar já no primeiro quadro** (por exemplo na tela "Copyright Warning" do MAME), sem uso de CPU. Causa: às vezes o DSP de
+  áudio falha ao iniciar a porta de áudio do HDMI (kernel: `Failed to start APM port 104 ... DISPLAY_PORT_RX_0`); o PulseAudio continua
+  dizendo que o sink está rodando, ninguém consome o áudio e o emulador espera por ele para sempre. Suspender e retomar o sink
+  (`pactl suspend-sink <sink HDMI> 1`, depois `0`) faz tudo voltar na hora. O [`extras/q6a-audiofix.sh`](extras/q6a-audiofix.sh) faz isso
+  sozinho, veja [Solução de problemas](#solução-de-problemas). Vai vir embutido na próxima release.
 - Ainda não incluídos: Kodi, Vulkan (o Turnip não existe neste Buildroot) e alguns núcleos menores (`vircon32`, `flycast-next`).
 - Energia: a placa pode ter queda de tensão sob carga pesada de NVMe + USB. Use uma boa fonte USB-C PD.
 
@@ -185,6 +203,14 @@ opções do `recalbox.conf` (comentadas por padrão):
   Master System, Game Boy, Game Gear, FBNeo). Se a sua TV tem modo jogo (ALLM / "Game Optimizer"), ligue: é o fator mais importante.
 - As atualizações oficiais do Recalbox ficam **desligadas** (`updates.enabled=0`): instalariam uma imagem que não roda nesta placa.
   Atualize gravando uma nova release, ou trocando `boot/linux`, `boot/initrd.gz` e `boot/recalbox` na partição de boot.
+
+### Solução de problemas
+
+**Um jogo congela no primeiro quadro / o frontend trava depois de sair de um jogo.** Instale o vigia de autocorreção (não precisa recompilar). De outro
+computador, copie os dois arquivos de [`extras/`](extras) para `/recalbox/share/system/` da placa (SSH `root`, ou o compartilhamento de rede `share`), como
+`q6a-audiofix.sh` e `custom.sh` (renomeie o `q6a-diag-custom.sh`; se você já tem um `custom.sh`, basta acrescentar a linha `bash /recalbox/share/system/q6a-audiofix.sh &`),
+e reinicie. O `custom.sh` também guarda o log do kernel e uma pulsação de 5 s em `/recalbox/share/system/logs/q6a-kernel.log` (do boot atual e dos dois anteriores):
+anexe-o ao relatar um problema.
 
 ### Instalar uma imagem pronta
 
