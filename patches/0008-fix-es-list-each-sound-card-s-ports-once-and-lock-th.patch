@@ -1,0 +1,241 @@
+From ce2c008f0c068082c461de71235eff74dd3e9756 Mon Sep 17 00:00:00 2001
+From: Rafael WMS <rafael.wms@live.com>
+Date: Wed, 21 Oct 2026 21:28:51 -0300
+Subject: [PATCH] fix(es): list each sound card's ports once and lock the
+ PulseAudio mainloop
+
+- GetPlaybackList() looped over sinks and listed every port of the card for each
+  sink, so a card with two sinks (HDMI + Headphones on the Q6A) showed 4 entries
+  and selecting a duplicate could crash EmulationStation.
+- pa_mainloop is not thread-safe, yet pa_context_* was called from the UI thread
+  while the mainloop thread ran: sliding the master volume quickly crashed ES in
+  pa_mainloop_prepare. The mainloop thread now holds a recursive mutex except
+  while polling, and every pa_context_* call from other threads takes it.
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .../audio/pulseaudio/PulseAudioController.cpp | 55 +++++++++++++++----
+ .../audio/pulseaudio/PulseAudioController.h   |  6 ++
+ 2 files changed, 49 insertions(+), 12 deletions(-)
+
+diff --git a/projects/frontend/es-core/src/audio/pulseaudio/PulseAudioController.cpp b/projects/frontend/es-core/src/audio/pulseaudio/PulseAudioController.cpp
+index abba903..e1b98e6 100755
+--- a/projects/frontend/es-core/src/audio/pulseaudio/PulseAudioController.cpp
++++ b/projects/frontend/es-core/src/audio/pulseaudio/PulseAudioController.cpp
+@@ -4,6 +4,7 @@
+ // Created by bkg2k on 19/12/2020.
+ //
+ 
++#include <algorithm>
+ #include "PulseAudioController.h"
+ #include <pulse/pulseaudio.h>
+ #include <utils/locale/LocaleHelper.h>
+@@ -467,12 +468,15 @@ IAudioController::DeviceList PulseAudioController::GetPlaybackList()
+ 
+   AddSpecialPlaybacks(result);
+ 
++  std::vector<const Card*> listedCards; // a card exposing several sinks must list its ports only once
+   for(const Sink& sink: mSinks)
+   {
+     const Card* card = GetCardByIndex(sink.CardIndex);
+     // Classic audio sink (card + port + profile)
+     if (card != nullptr && !card->Ports.empty())
+     {
++      if (std::find(listedCards.begin(), listedCards.end(), card) != listedCards.end()) continue;
++      listedCards.push_back(card);
+       for(const Port& port : card->Ports)
+       {
+         bool available = port.Available;
+@@ -627,7 +631,9 @@ void PulseAudioController::UpdateDefaultSink()
+ {
+   { LOG(LogInfo) << "[PulseAudio] Get server info"; }
+ 
+-  pa_operation* serverInfoOp = pa_context_get_server_info(mPulseAudioContext, GetServerInfoCallback, this);
++  pa_operation* serverInfoOp;
++
++  { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); serverInfoOp = pa_context_get_server_info(mPulseAudioContext, GetServerInfoCallback, this); }
+   // Wait for response
+   mSignal.WaitSignal(sTimeOut);
+   // Release
+@@ -814,7 +820,9 @@ String PulseAudioController::SetDefaultPlayback(const String& originalPlaybackNa
+ 
+       { LOG(LogInfo) << "[PulseAudio] Activating profile " << profile->Name << " for card #" << card->Index << ' ' << card->Name; }
+ 
+-      pa_operation* profileOp = pa_context_set_card_profile_by_index(mPulseAudioContext, card->Index, profile->Name.data(), SetProfileCallback,this);
++      pa_operation* profileOp;
++
++      { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); profileOp = pa_context_set_card_profile_by_index(mPulseAudioContext, card->Index, profile->Name.data(), SetProfileCallback,this); }
+       // Wait for response
+       mSignal.WaitSignal(sTimeOut);
+       // Release
+@@ -840,7 +848,8 @@ String PulseAudioController::SetDefaultPlayback(const String& originalPlaybackNa
+         { LOG(LogError) << "[PulseAudio] No sink found!"; return playbackName; } // should never happend again
+ 
+       { LOG(LogDebug) << "[PulseAudio] Switching sink '" << sink->Name << "' to port " << port->Name; }
+-      pa_operation* op = pa_context_set_sink_port_by_name(mPulseAudioContext, sink->Name.data(), port->Name.data(), SetPortCallback, this);
++      pa_operation* op;
++      { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); op = pa_context_set_sink_port_by_name(mPulseAudioContext, sink->Name.data(), port->Name.data(), SetPortCallback, this); }
+       // Wait for result
+       mSignal.WaitSignal(sTimeOut);
+       // Release
+@@ -849,7 +858,8 @@ String PulseAudioController::SetDefaultPlayback(const String& originalPlaybackNa
+     }
+ 
+     // Set sink the default one
+-    pa_operation* op = pa_context_set_default_sink(mPulseAudioContext, sink->Name.data(), SetSinkCallback, this);
++    pa_operation* op;
++    { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); op = pa_context_set_default_sink(mPulseAudioContext, sink->Name.data(), SetSinkCallback, this); }
+     mActiveSinkIndex = sink->Index;
+     // Wait for result
+     mSignal.WaitSignal(sTimeOut);
+@@ -858,7 +868,7 @@ String PulseAudioController::SetDefaultPlayback(const String& originalPlaybackNa
+      { LOG(LogDebug) << "[PulseAudio] Sink '" << sink->Name << "' has been set as default sink."; }
+ 
+     // Unmute sink
+-    op = pa_context_set_sink_mute_by_name(mPulseAudioContext, sink->Name.data(), 0, SetMuteCallback, this);
++    { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); op = pa_context_set_sink_mute_by_name(mPulseAudioContext, sink->Name.data(), 0, SetMuteCallback, this); }
+     // Wait for result
+     mSignal.WaitSignal(sTimeOut);
+     // Release
+@@ -886,7 +896,8 @@ int PulseAudioController::GetVolume()
+   Mutex::AutoLock lock(mSyncer);
+ 
+   // Set volume
+-  pa_operation* op = pa_context_get_sink_info_by_index(mPulseAudioContext, mActiveSinkIndex, GetVolumeCallback, this);
++  pa_operation* op;
++  { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); op = pa_context_get_sink_info_by_index(mPulseAudioContext, mActiveSinkIndex, GetVolumeCallback, this); }
+   // Wait for result
+   mSignal.WaitSignal(sTimeOut);
+   // Release
+@@ -915,7 +926,8 @@ void PulseAudioController::SetVolume(int volume)
+     pa_cvolume_set(&volumeStructure, sink.Channels, (int)Math::round(((double)PA_VOLUME_NORM * (double)volume) / 100.0));
+ 
+     // Set volume
+-    pa_operation* op = pa_context_set_sink_volume_by_index(mPulseAudioContext, sink.Index, &volumeStructure, SetVolumeCallback, this);
++    pa_operation* op;
++    { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); op = pa_context_set_sink_volume_by_index(mPulseAudioContext, sink.Index, &volumeStructure, SetVolumeCallback, this); }
+     // Wait for result
+     mSignal.WaitSignal(sTimeOut);
+     // Release
+@@ -940,8 +952,18 @@ void PulseAudioController::SetMusicVolume(int volume)
+   Mix_VolumeMusic((volume*MIX_MAX_VOLUME)/100);
+ }
+ 
++int PulseAudioController::PollWithUnlock(struct pollfd* ufds, unsigned long nfds, int timeout, void* userdata)
++{
++  PulseAudioController& This = *(PulseAudioController*)userdata;
++  This.mLoopLock.unlock();
++  int result = poll(ufds, nfds, timeout);
++  This.mLoopLock.lock();
++  return result;
++}
++
+ void PulseAudioController::Break()
+ {
++  std::lock_guard<std::recursive_mutex> paLock(mLoopLock);
+   pa_mainloop_quit(mPulseAudioMainLoop, 1);
+ }
+ 
+@@ -949,7 +971,9 @@ void PulseAudioController::Run()
+ {
+ 
+   // Create a mainloop API and connection to the default server
++  mLoopLock.lock();
+   mPulseAudioMainLoop = pa_mainloop_new();
++  pa_mainloop_set_poll_func(mPulseAudioMainLoop, PollWithUnlock, this);
+   pa_mainloop_api* pa_mlapi = pa_mainloop_get_api(mPulseAudioMainLoop);
+   mPulseAudioContext = pa_context_new(pa_mlapi, "Recalbox");
+   // This function defines a callback so the server will tell us it's state.
+@@ -964,6 +988,7 @@ void PulseAudioController::Run()
+   // Deinit
+   pa_context_unref(mPulseAudioContext);
+   pa_mainloop_free(mPulseAudioMainLoop);
++  mLoopLock.unlock();
+ }
+ 
+ void PulseAudioController::PulseContextConnect()
+@@ -976,7 +1001,7 @@ void PulseAudioController::PulseContextConnect()
+ void PulseAudioController::PulseContextDisconnect()
+ {
+   // Disconnect from pulse server
+-  pa_context_disconnect(mPulseAudioContext);
++  { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); pa_context_disconnect(mPulseAudioContext); }
+   { LOG(LogInfo) << "[PulseAudio] Disconnected to Server."; }
+ }
+ 
+@@ -1091,7 +1116,9 @@ void PulseAudioController::SetDefaultProfiles()
+     // Activate selected profile
+     { LOG(LogInfo) << "[PulseAudio] Activating profile " << selectedProfile->Description << " for card #" << card.Index << ' ' << card.Name; }
+ 
+-    pa_operation* profileOp = pa_context_set_card_profile_by_index(mPulseAudioContext, card.Index, selectedProfile->Name.data(), SetProfileCallback, this);
++    pa_operation* profileOp;
++
++    { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); profileOp = pa_context_set_card_profile_by_index(mPulseAudioContext, card.Index, selectedProfile->Name.data(), SetProfileCallback, this); }
+     // Wait for response
+     mSignal.WaitSignal(sTimeOut);
+     // Release
+@@ -1107,7 +1134,8 @@ void PulseAudioController::PulseEnumerateSinks()
+ 
+   // Enumerate cards
+   { LOG(LogInfo) << "[PulseAudio] Enumerating Sinks."; }
+-  pa_operation* sinkOp = pa_context_get_sink_info_list(mPulseAudioContext, EnumerateSinkCallback, this);
++  pa_operation* sinkOp;
++  { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); sinkOp = pa_context_get_sink_info_list(mPulseAudioContext, EnumerateSinkCallback, this); }
+   // Wait for response
+   mSignal.WaitSignal(sTimeOut);
+   // Release
+@@ -1122,7 +1150,8 @@ void PulseAudioController::PulseEnumerateCards()
+ 
+   // Enumerate cards
+   { LOG(LogInfo) << "[PulseAudio] Enumerating Cards."; }
+-  pa_operation* cardOp = pa_context_get_card_info_list(mPulseAudioContext, EnumerateCardCallback, this);
++  pa_operation* cardOp;
++  { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); cardOp = pa_context_get_card_info_list(mPulseAudioContext, EnumerateCardCallback, this); }
+   // Wait for response
+   mSignal.WaitSignal(sTimeOut);
+   // Release
+@@ -1137,6 +1166,7 @@ void PulseAudioController::PulseSubscribe()
+ {
+   { LOG(LogInfo) << "[PulseAudio] Subscribing to events"; }
+ 
++  std::lock_guard<std::recursive_mutex> paLock(mLoopLock);
+   pa_context_set_subscribe_callback(mPulseAudioContext, SubscriptionCallback, this);
+   pa_context_subscribe(mPulseAudioContext, PA_SUBSCRIPTION_MASK_ALL, nullptr, nullptr);
+ }
+@@ -1331,7 +1361,8 @@ void PulseAudioController::ReceiveSyncMessage()
+ 
+ void PulseAudioController::SetOutputPort(String portName)
+ {
+-  pa_operation* op = pa_context_set_sink_port_by_name(mPulseAudioContext, mServerInfo.DefaultSinkName.c_str(), portName.c_str(), SetPortCallback, this);
++  pa_operation* op;
++  { std::lock_guard<std::recursive_mutex> paLock(mLoopLock); op = pa_context_set_sink_port_by_name(mPulseAudioContext, mServerInfo.DefaultSinkName.c_str(), portName.c_str(), SetPortCallback, this); }
+   // Wait for result
+   mSignal.WaitSignal(sTimeOut);
+   // Release
+diff --git a/projects/frontend/es-core/src/audio/pulseaudio/PulseAudioController.h b/projects/frontend/es-core/src/audio/pulseaudio/PulseAudioController.h
+index e50aca9..1cb1dc1 100644
+--- a/projects/frontend/es-core/src/audio/pulseaudio/PulseAudioController.h
++++ b/projects/frontend/es-core/src/audio/pulseaudio/PulseAudioController.h
+@@ -7,6 +7,8 @@
+ #include <audio/IAudioNotification.h>
+ #include <pulse/pulseaudio.h>
+ #include <vector>
++#include <mutex>
++#include <poll.h>
+ #include <utils/os/system/Thread.h>
+ #include <utils/os/system/Signal.h>
+ #include <utils/sync/SyncMessageSender.h>
+@@ -165,6 +167,10 @@ class PulseAudioController: public IAudioController
+     pa_mainloop* mPulseAudioMainLoop;
+     //! Signal
+     Signal mSignal;
++    //! pa_mainloop is not thread-safe: held by the mainloop thread except while polling, taken around every pa_context_* call made from other threads
++    std::recursive_mutex mLoopLock;
++    //! Poll function releasing mLoopLock while waiting for events
++    static int PollWithUnlock(struct pollfd* ufds, unsigned long nfds, int timeout, void* userdata);
+ 
+     //! Notifier Sync messager
+     SyncMessageSender<void> mEvent;
+-- 
+2.53.0
+

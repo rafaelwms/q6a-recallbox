@@ -100,3 +100,13 @@ Earlier ES log signatures (12-13 Oct): after "Start in-game Hardware processes" 
 Fix: extras/q6a-audiofix.sh (reads /dev/kmsg, cycles the HDMI sink, max 5 tries/min), installed on the board via custom.sh, to be shipped in the image
 (fsoverlay init script) in the next release. Root cause (why the DSP port start fails, probably a DP audio / modeset race) is still open: candidates are
 a kernel/driver fix or starting audio after the modeset.
+
+### 2026-10-21 - EmulationStation audio bugs (duplicated outputs, crash on fast volume change)
+Two bugs of upstream EmulationStation, both fixed by `patches/0008` (es-core/src/audio/pulseaudio/PulseAudioController.{cpp,h}):
+- **Output Device listed 4 entries instead of 2.** `GetPlaybackList()` looped over sinks and listed every port of the card for each sink; the Q6A has two sinks (HDMI, Headphones)
+  on one sound card. Selecting a duplicated entry crashed ES (DEATHTRAP, backtrace in `pa_mainloop_prepare`). Ports are now listed once per card. The duplicated list is **not** what
+  triggers the DSP "Failed to start APM port" error (counter unchanged during the test, sink stayed RUNNING).
+- **ES restarted when sliding the master volume quickly.** `pa_mainloop` is not thread-safe, yet `pa_context_*` was called from the UI thread while the mainloop thread ran.
+  The mainloop thread now holds a recursive mutex except inside `poll()` (`pa_mainloop_set_poll_func`); every `pa_context_*` call from another thread takes it (never while waiting for a result).
+Verified on the board: 2 entries, volume swept 0-100-0 several times plus a long gaming session without a restart.
+Tooling note: with an SSH key from the build machine, pulling/pushing the 1.7 GB rootfs runs at ~190 MB/s read over the 2.5 GbE link (writes to the vfat /boot are ~26 MB/s).
