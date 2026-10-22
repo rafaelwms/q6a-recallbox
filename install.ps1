@@ -147,7 +147,8 @@ try {
     Get-ChildItem -LiteralPath $dir -File | Where-Object { $_.Name -like "*$ImageType*" -or $_.Name -like 'SHA256SUMS-*.txt' } | Copy-Item -Destination $work
   } else {
     Write-Host (T 'fetching')
-    try { $rel = Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoSlug/releases/latest" -Headers @{ 'User-Agent' = 'q6a-recalbox-installer' } }
+    # /releases/latest ignores pre-releases, so take the newest entry of the list instead
+    try { $rel = @(Invoke-RestMethod -Uri "https://api.github.com/repos/$RepoSlug/releases?per_page=1" -Headers @{ 'User-Agent' = 'q6a-recalbox-installer' })[0] }
     catch { Write-Host (T 'release_error') -ForegroundColor Red; exit 1 }
     $assets = @($rel.assets | Where-Object { $_.name -like "*$ImageType*" -or $_.name -like 'SHA256SUMS*' })
     if ($assets.Count -eq 0) { Write-Host (T 'no_assets') -ForegroundColor Red; exit 1 }

@@ -259,7 +259,7 @@ if [ "$source_pick" = "2" ]; then
 	cp "$local_dir"/SHA256SUMS-*.txt "$WORKDIR"/ 2>/dev/null || true
 else
 	msg fetching_release
-	RELEASE_JSON="$(curl -sL "https://api.github.com/repos/${REPO_SLUG}/releases/latest")" || {
+	RELEASE_JSON="$(curl -sL "https://api.github.com/repos/${REPO_SLUG}/releases?per_page=1")" || {
 		echo "$(msg release_error)" >&2
 		exit 1
 	}

@@ -4,3 +4,7 @@
 /output/
 /recalbox/
 /release/
+
+# drafts of outreach messages (not published with the repo)
+/POST.md
+/MESSAGE-RECALBOX.md
