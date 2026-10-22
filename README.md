@@ -8,11 +8,22 @@ Bluetooth working, on a mainline Linux 7.2.9 kernel.
 Sibling project of [ubuntu-26.04.1-dragon-q6a](https://github.com/rafaelwms/ubuntu-26.04.1-dragon-q6a), which provided the
 hardware recipe (firmware, audio UCM, AIC8800 Wi-Fi/BT).
 
+> **Unofficial community port** — not affiliated with or supported by the Recalbox team, Radxa or Qualcomm; non-commercial use only (see [NOTICE.md](NOTICE.md)).
+> **Port não oficial da comunidade** — sem vínculo ou suporte da equipe do Recalbox, da Radxa ou da Qualcomm; somente uso não comercial (veja o [NOTICE.md](NOTICE.md)).
+
 🇧🇷 **[Leia em português mais abaixo](#português)**
 
 ---
 
 ## English
+
+### Screenshots
+
+Captured on a Radxa Dragon Q6A running this image (v0.1.2), straight from the HDMI output.
+
+![System Settings showing VERSION 0.1.2 and BOARD Radxa Dragon Q6A 64bits](docs/img/q6a-system-settings.png)
+
+![EmulationStation, Favorites system, running on the Dragon Q6A](docs/img/q6a-favorites.png)
 
 ### What works
 
@@ -67,37 +78,73 @@ Set `global.videomode` (and `system.es.videomode`) in `recalbox.conf`, or use *M
 
 ### Troubleshooting
 
-**A game freezes on its first frame / the frontend hangs after leaving a game.** Install the self-heal watcher (no rebuild needed). From a
-computer, copy the two files in [`extras/`](extras) to `/recalbox/share/system/` on the board (SSH `root`, or the `share` network share), as
-`q6a-audiofix.sh` and `custom.sh` (rename `q6a-diag-custom.sh`; if you already have a `custom.sh`, just add its `bash /recalbox/share/system/q6a-audiofix.sh &` line),
-then reboot. `custom.sh` also keeps a kernel log and a 5-second heartbeat in `/recalbox/share/system/logs/q6a-kernel.log` (current boot and the two previous ones):
-please attach it when reporting a bug.
+**A game freezes on its first frame / the frontend hangs after leaving a game.** Since **v0.1.2** the image ships the HDMI audio self-heal watcher
+(`/usr/bin/q6a-audiofix`, started at boot, log in `/recalbox/share/system/logs/q6a-audiofix.log`); nothing to install. Turn it off with
+`q6a.audiofix=0` in `recalbox.conf`. On **v0.1.0 / v0.1.1** copy the two files in [`extras/`](extras) to `/recalbox/share/system/` (SSH `root`, or the
+`share` network share) as `q6a-audiofix.sh` and `custom.sh` (rename `q6a-diag-custom.sh`) and reboot. If you upgrade from those versions to v0.1.2,
+**delete that `custom.sh`**: the image now does the same by itself.
+
+**Bug reports.** v0.1.2 keeps a kernel log and a 5-second heartbeat in `/recalbox/share/system/logs/q6a-kernel.log` (current boot and the two previous
+ones, at most 50 MB each; `q6a.diaglog=0` disables it). Please attach it, plus `frontend.log` from the same folder, to the issue. They contain no passwords;
+the `frontend.log` does contain the names of your ROM files and a device UUID, so skim it first.
+
+**The Output Device list had 4 entries and sliding the volume could restart the frontend.** Fixed in v0.1.2 (upstream EmulationStation bugs,
+[`patches/0008`](patches/0008-fix-es-list-each-sound-card-s-ports-once-and-lock-th.patch)).
 
 ### Install a pre-built image
 
-1. Go to [Releases](../../releases) and download **all** `.part*` files plus the two `SHA256SUMS-*.txt` files.
-2. Run the interactive installer for your OS — it verifies the checksums, reassembles the image and flashes it, asking you
-   to confirm the exact target device before writing anything:
+**1. Pick the storage** (the installer erases it completely and writes the whole image; the `SHARE` and `OVERLAY` partitions are created in the free space on first boot):
 
-   ```bash
-   ./install.sh       # Linux
-   ./install_mac.sh   # macOS
-   ```
+| Medium | Status | Notes |
+|---|---|---|
+| USB 3.0 SSD / SATA SSD in a USB case | ✅ tested | Best choice for an external drive. |
+| NVMe SSD in a USB NVMe case, or the board's internal M.2 NVMe | ✅ tested | Flash it from your computer in the USB case, then move it to the board's M.2 slot; or see [the NVMe guide](#install-on-the-internal-nvme-next-to-other-systems) to keep other systems. |
+| microSD card | ⚠️ not tested by the maintainer | Use a good card, ≥ 32 GB, A1/A2. Make sure your board firmware boots from the SD slot. |
+| USB stick | ⚠️ not tested by the maintainer | Use a USB 3.0 stick ≥ 32 GB; slow sticks make the menus and saves sluggish. |
 
-   Or by hand (Linux):
+The image needs about 5 GiB; any medium of **16 GB or more** works, **32 GB or more** leaves room for ROMs in `SHARE`.
 
-   ```bash
-   sha256sum -c SHA256SUMS-parts.txt --ignore-missing
-   cat recalbox-radxa-dragon-q6a_<version>.img.xz.part* > image.img.xz
-   sha256sum -c SHA256SUMS-full.txt --ignore-missing
-   xzcat image.img.xz | sudo dd of=/dev/YOUR_DEVICE bs=4M status=progress conv=fsync
-   ```
+**2. Download** [Releases](../../releases): **all** `.part*` files plus the two `SHA256SUMS-*.txt` files (or let the installer download them), then run the
+installer for your OS. Each one verifies the checksums, reassembles and unpacks the image and flashes it, asking you to type the exact target disk and a
+confirmation word before it writes anything. English and Brazilian Portuguese are both offered.
 
-   ⚠️ Triple-check the target with `lsblk` first: this erases the whole device.
+| OS | Command | Needs |
+|---|---|---|
+| **Linux** | `./install.sh` | `curl`, `xz`, `sudo`, `lsblk` |
+| **macOS** | `./install_mac.sh` | `curl`, `xz` (`brew install xz`), `sudo` |
+| **Windows 10/11** | PowerShell **as Administrator**: `Set-ExecutionPolicy -Scope Process Bypass -Force; .\install.ps1` | [7-Zip](https://www.7-zip.org/) (`winget install 7zip.7zip`), ~6 GB free in `%TEMP%` |
 
-3. Boot the board from it (UEFI boot menu, or rEFInd). The **first boot takes 1–2 minutes**: Recalbox creates its `SHARE`
-   (exFAT) and `OVERLAY` (ext4) partitions in the free space of the disk. Do not power off during this step.
-4. SSH is enabled: user `root`, password `recalboxroot` (change it in `recalbox.conf`).
+> The Windows script follows the same flow as the Linux/macOS ones but, as of v0.1.2, the maintainer has not been able to run it on real Windows hardware: if it
+> misbehaves, please open an issue and use the manual steps below.
+
+**Or by hand.** Linux:
+
+```bash
+sha256sum -c SHA256SUMS-parts.txt --ignore-missing
+cat recalbox-radxa-dragon-q6a_<version>.img.xz.part* > image.img.xz
+sha256sum -c SHA256SUMS-full.txt --ignore-missing
+xzcat image.img.xz | sudo dd of=/dev/YOUR_DEVICE bs=4M status=progress conv=fsync
+```
+
+macOS (`diskutil list` to find the disk, e.g. `disk4`):
+
+```bash
+shasum -a 256 -c SHA256SUMS-parts.txt          # lines for files you did not download are reported as missing
+cat recalbox-radxa-dragon-q6a_<version>.img.xz.part* > image.img.xz
+diskutil unmountDisk /dev/disk4
+xzcat image.img.xz | sudo dd of=/dev/rdisk4 bs=4m && diskutil eject /dev/disk4
+```
+
+Windows (Command Prompt): `copy /b recalbox-radxa-dragon-q6a_<version>.img.xz.part* image.img.xz`, check it with `certutil -hashfile image.img.xz SHA256`
+against `SHA256SUMS-full.txt`, unpack it with 7-Zip and write the `.img` with [Rufus](https://rufus.ie/) or [balenaEtcher](https://etcher.balena.io/).
+
+⚠️ Triple-check the target (`lsblk`, `diskutil list`, Disk Management): this erases the whole device.
+
+**3. Boot** the board from it (UEFI boot menu, or rEFInd). The **first boot takes 1–2 minutes**: Recalbox creates `SHARE` (exFAT) and `OVERLAY` (ext4).
+Do not power off during this step. The default video mode is 1080p60.
+
+**4.** SSH is enabled: user `root`, password `recalboxroot` (**change it** in `recalbox.conf`; optionally add your public key to
+`/recalbox/share/system/.ssh/authorized_keys`).
 
 ### Install on the internal NVMe next to other systems
 
@@ -118,28 +165,35 @@ automatically. Boot partitions are found by the label `RECALBOX`: unplug any oth
 
 ### Build it yourself from source
 
-This repository contains only the Q6A-specific delta; upstream Recalbox is cloned unmodified and the series in
-[`patches/`](patches) is applied on top.
+This repository contains only the Q6A-specific delta; upstream Recalbox is cloned at the pinned commit recorded in `scripts/bootstrap.sh` (`27224c1`) and the
+series in [`patches/`](patches) is applied on top. One command does everything (clone, patches, build, licence manifest, split release assets):
 
 ```bash
-./scripts/bootstrap.sh          # clone upstream into ./recalbox and apply patches/
-cd recalbox
-make recalbox-q6a_defconfig
-make -j"$(nproc)"               # ~90 min on 20 cores the first time; a few minutes afterwards (ccache)
-../scripts/make-release.sh v0.1.0 output/images/recalbox/recalbox-q6a.img.xz ../release   # split into release assets
+./scripts/build-all.sh v0.1.2   # ~90 min on 20 cores the first time; a few minutes afterwards (ccache). Output: release/v0.1.2/
 ```
 
-Very new hosts (e.g. Ubuntu 26.04) need a few workarounds for the old Buildroot (GCC 14 for host tools, CMake 3.31 in
-`PATH`, `CMAKE_POLICY_VERSION_MINIMUM=3.5`, `LC_ALL=C`, `TERM`, `dpkg-deb`, `rsync`, and `scripts/fetch_gitlab.py` for the
+Or step by step:
+
+```bash
+./scripts/bootstrap.sh
+cd recalbox && make recalbox-q6a_defconfig && make -j"$(nproc)" && make legal-info
+../scripts/make-release.sh v0.1.2 output/images/recalbox/recalbox-q6a.img.xz ../release/v0.1.2   # parts <= 1.4 GB + SHA-256 sums
+```
+
+Very new hosts (e.g. Ubuntu 26.04) need a few workarounds for the old Buildroot (GCC 14 for host tools via `HOSTCC14`/`HOSTCXX14`, CMake 3.31 in
+`CMAKE3_BIN`, `CMAKE_POLICY_VERSION_MINIMUM=3.5`, `LC_ALL=C`, `TERM`, `dpkg-deb`, `rsync`, and `scripts/fetch_gitlab.py` for the
 gitlab.com tarballs that return 403). They are listed in [docs/PLAN.md](docs/PLAN.md).
 
 **Updating a running board without re-flashing:** copy `output/images/boot-data/boot/recalbox` to `/boot/boot/recalbox.new`
-(remount `/boot` read-write), rename it over `recalbox` (keep the old one as `recalbox.old`) and reboot.
+(remount `/boot` read-write; it only has room for two system files, so remove the oldest `recalbox.old` first), rename it over `recalbox` (keep the
+old one as `recalbox.old`), check the `md5sum` and reboot. With an SSH key installed, send it straight from the build machine over SSH.
 
 ### Firmware and licences
 
+This is an **unofficial, non-commercial** community port; read [NOTICE.md](NOTICE.md) and [LICENSE-RECALBOX.md](LICENSE-RECALBOX.md) before you redistribute anything.
 The build downloads Radxa's firmware packages ([radxa-pkg](https://github.com/radxa-pkg): DSP firmware, AudioReach topology,
-`alsa-ucm-conf`, AIC8800) and does not redistribute them in this repository. The `aic8800` driver is GPL-2.0.
+`alsa-ucm-conf`, AIC8800); they are proprietary, are not stored in this repository, and are included in the image. The `aic8800` driver is GPL-2.0.
+Every release ships `q6a-legal-info_<version>.tar.gz` (licences and source list of every package, from Buildroot's `make legal-info`).
 
 ### Credits
 
@@ -147,11 +201,20 @@ The build downloads Radxa's firmware packages ([radxa-pkg](https://github.com/ra
 
 ### License
 
-[MIT](LICENSE). Upstream Recalbox and the emulators keep their own licenses.
+The scripts, installers and documents in this repository are [MIT](LICENSE). The **image** is a derivative of Recalbox and is distributed under the
+Recalbox licence: **non-commercial**, see [LICENSE-RECALBOX.md](LICENSE-RECALBOX.md) and [NOTICE.md](NOTICE.md). The emulators and other components keep their own licences.
 
 ---
 
 ## Português
+
+### Capturas de tela
+
+Capturadas numa Radxa Dragon Q6A rodando esta imagem (v0.1.2), direto da saída HDMI.
+
+![Configurações do sistema mostrando VERSION 0.1.2 e BOARD Radxa Dragon Q6A 64bits](docs/img/q6a-system-settings.png)
+
+![EmulationStation, sistema Favoritos, rodando na Dragon Q6A](docs/img/q6a-favorites.png)
 
 ### O que funciona
 
@@ -206,37 +269,73 @@ opções do `recalbox.conf` (comentadas por padrão):
 
 ### Solução de problemas
 
-**Um jogo congela no primeiro quadro / o frontend trava depois de sair de um jogo.** Instale o vigia de autocorreção (não precisa recompilar). De outro
-computador, copie os dois arquivos de [`extras/`](extras) para `/recalbox/share/system/` da placa (SSH `root`, ou o compartilhamento de rede `share`), como
-`q6a-audiofix.sh` e `custom.sh` (renomeie o `q6a-diag-custom.sh`; se você já tem um `custom.sh`, basta acrescentar a linha `bash /recalbox/share/system/q6a-audiofix.sh &`),
-e reinicie. O `custom.sh` também guarda o log do kernel e uma pulsação de 5 s em `/recalbox/share/system/logs/q6a-kernel.log` (do boot atual e dos dois anteriores):
-anexe-o ao relatar um problema.
+**Um jogo congela no primeiro quadro / o frontend trava depois de sair de um jogo.** Desde a **v0.1.2** a imagem traz o vigia de autocorreção do áudio HDMI
+(`/usr/bin/q6a-audiofix`, iniciado no boot, log em `/recalbox/share/system/logs/q6a-audiofix.log`); não precisa instalar nada. Para desligar, use
+`q6a.audiofix=0` no `recalbox.conf`. Na **v0.1.0 / v0.1.1**, copie os dois arquivos de [`extras/`](extras) para `/recalbox/share/system/` (SSH `root`, ou o
+compartilhamento de rede `share`) como `q6a-audiofix.sh` e `custom.sh` (renomeie o `q6a-diag-custom.sh`) e reinicie. Se você atualizar dessas versões para a v0.1.2,
+**apague esse `custom.sh`**: a imagem agora faz o mesmo sozinha.
+
+**Relatos de bug.** A v0.1.2 guarda o log do kernel e uma pulsação de 5 s em `/recalbox/share/system/logs/q6a-kernel.log` (boot atual e os dois anteriores,
+no máximo 50 MB cada; `q6a.diaglog=0` desliga). Anexe-o, junto com o `frontend.log` da mesma pasta, à issue. Não têm senhas; o `frontend.log` tem os nomes
+dos seus arquivos de ROM e um UUID do aparelho, então dê uma olhada antes.
+
+**A lista de Output Device mostrava 4 entradas e deslizar o volume podia reiniciar o frontend.** Corrigido na v0.1.2 (bugs do EmulationStation original,
+[`patches/0008`](patches/0008-fix-es-list-each-sound-card-s-ports-once-and-lock-th.patch)).
 
 ### Instalar uma imagem pronta
 
-1. Vá em [Releases](../../releases) e baixe **todos** os arquivos `.part*` mais os dois `SHA256SUMS-*.txt`.
-2. Rode o instalador interativo do seu sistema — ele confere os checksums, reconstrói a imagem e grava, pedindo pra você
-   confirmar o dispositivo de destino antes de escrever qualquer coisa:
+**1. Escolha o armazenamento** (o instalador apaga tudo e grava a imagem inteira; as partições `SHARE` e `OVERLAY` são criadas no espaço livre no primeiro boot):
 
-   ```bash
-   ./install.sh       # Linux
-   ./install_mac.sh   # macOS
-   ```
+| Mídia | Situação | Observações |
+|---|---|---|
+| SSD USB 3.0 / SSD SATA em case USB | ✅ testado | Melhor escolha para um disco externo. |
+| SSD NVMe em case USB NVMe, ou o NVMe M.2 interno da placa | ✅ testado | Grave pelo computador, no case USB, e depois passe para o slot M.2 da placa; ou veja [o guia do NVMe](#instalar-no-nvme-interno-junto-com-outros-sistemas) para manter outros sistemas. |
+| Cartão microSD | ⚠️ não testado pelo mantenedor | Use um cartão bom, ≥ 32 GB, A1/A2. Confirme que o firmware da sua placa dá boot pelo slot SD. |
+| Pendrive | ⚠️ não testado pelo mantenedor | Use um pendrive USB 3.0 ≥ 32 GB; pendrives lentos deixam menus e saves travando. |
 
-   Ou na mão (Linux):
+A imagem ocupa cerca de 5 GiB; qualquer mídia de **16 GB ou mais** funciona, e **32 GB ou mais** deixa espaço para as ROMs no `SHARE`.
 
-   ```bash
-   sha256sum -c SHA256SUMS-parts.txt --ignore-missing
-   cat recalbox-radxa-dragon-q6a_<versao>.img.xz.part* > imagem.img.xz
-   sha256sum -c SHA256SUMS-full.txt --ignore-missing
-   xzcat imagem.img.xz | sudo dd of=/dev/SEU_DISPOSITIVO bs=4M status=progress conv=fsync
-   ```
+**2. Baixe** em [Releases](../../releases) **todos** os arquivos `.part*` mais os dois `SHA256SUMS-*.txt` (ou deixe o instalador baixar), e rode o instalador do
+seu sistema. Cada um confere os checksums, reconstrói e descompacta a imagem e grava, pedindo que você digite o disco exato de destino e uma palavra de
+confirmação antes de escrever qualquer coisa. Os dois oferecem inglês e português do Brasil.
 
-   ⚠️ Confira o dispositivo de destino com `lsblk` antes: isso apaga o dispositivo inteiro.
+| Sistema | Comando | Precisa de |
+|---|---|---|
+| **Linux** | `./install.sh` | `curl`, `xz`, `sudo`, `lsblk` |
+| **macOS** | `./install_mac.sh` | `curl`, `xz` (`brew install xz`), `sudo` |
+| **Windows 10/11** | PowerShell **como Administrador**: `Set-ExecutionPolicy -Scope Process Bypass -Force; .\install.ps1` | [7-Zip](https://www.7-zip.org/) (`winget install 7zip.7zip`), ~6 GB livres em `%TEMP%` |
 
-3. Dê boot na placa por ele (menu de boot do UEFI, ou rEFInd). O **primeiro boot leva 1–2 minutos**: o Recalbox cria as partições
-   `SHARE` (exFAT) e `OVERLAY` (ext4) no espaço livre do disco. Não desligue durante essa etapa.
-4. O SSH vem ligado: usuário `root`, senha `recalboxroot` (troque no `recalbox.conf`).
+> O script do Windows segue o mesmo fluxo dos de Linux/macOS mas, até a v0.1.2, o mantenedor não conseguiu rodá-lo num Windows real: se algo der errado,
+> abra uma issue e use os passos manuais abaixo.
+
+**Ou na mão.** Linux:
+
+```bash
+sha256sum -c SHA256SUMS-parts.txt --ignore-missing
+cat recalbox-radxa-dragon-q6a_<versao>.img.xz.part* > imagem.img.xz
+sha256sum -c SHA256SUMS-full.txt --ignore-missing
+xzcat imagem.img.xz | sudo dd of=/dev/SEU_DISPOSITIVO bs=4M status=progress conv=fsync
+```
+
+macOS (`diskutil list` para achar o disco, ex.: `disk4`):
+
+```bash
+shasum -a 256 -c SHA256SUMS-parts.txt          # linhas de arquivos que você não baixou aparecem como ausentes
+cat recalbox-radxa-dragon-q6a_<versao>.img.xz.part* > imagem.img.xz
+diskutil unmountDisk /dev/disk4
+xzcat imagem.img.xz | sudo dd of=/dev/rdisk4 bs=4m && diskutil eject /dev/disk4
+```
+
+Windows (Prompt de Comando): `copy /b recalbox-radxa-dragon-q6a_<versao>.img.xz.part* imagem.img.xz`, confira com `certutil -hashfile imagem.img.xz SHA256`
+contra o `SHA256SUMS-full.txt`, descompacte com o 7-Zip e grave o `.img` com o [Rufus](https://rufus.ie/) ou o [balenaEtcher](https://etcher.balena.io/).
+
+⚠️ Confira o destino com muito cuidado (`lsblk`, `diskutil list`, Gerenciamento de Disco): isso apaga o dispositivo inteiro.
+
+**3. Dê boot** na placa por ele (menu de boot do UEFI, ou rEFInd). O **primeiro boot leva 1–2 minutos**: o Recalbox cria `SHARE` (exFAT) e `OVERLAY` (ext4).
+Não desligue durante essa etapa. O modo de vídeo padrão é 1080p60.
+
+**4.** O SSH vem ligado: usuário `root`, senha `recalboxroot` (**troque** no `recalbox.conf`; se quiser, ponha sua chave pública em
+`/recalbox/share/system/.ssh/authorized_keys`).
 
 ### Instalar no NVMe interno junto com outros sistemas
 
@@ -257,28 +356,35 @@ A partição de boot é encontrada pelo rótulo `RECALBOX`: desconecte antes qua
 
 ### Compilar você mesmo, a partir do código
 
-Este repositório contém só a parte específica da Q6A; o Recalbox oficial é clonado sem modificações e a série em
-[`patches/`](patches) é aplicada por cima.
+Este repositório contém só a parte específica da Q6A; o Recalbox oficial é clonado no commit fixado em `scripts/bootstrap.sh` (`27224c1`) e a série em
+[`patches/`](patches) é aplicada por cima. Um comando faz tudo (clone, patches, build, manifesto de licenças, arquivos da release divididos):
 
 ```bash
-./scripts/bootstrap.sh          # clona o upstream em ./recalbox e aplica patches/
-cd recalbox
-make recalbox-q6a_defconfig
-make -j"$(nproc)"               # ~90 min em 20 núcleos na primeira vez; alguns minutos depois (ccache)
-../scripts/make-release.sh v0.1.0 output/images/recalbox/recalbox-q6a.img.xz ../release   # gera os arquivos da release
+./scripts/build-all.sh v0.1.2   # ~90 min em 20 núcleos na primeira vez; alguns minutos depois (ccache). Saída: release/v0.1.2/
 ```
 
-Hosts muito novos (ex.: Ubuntu 26.04) precisam de alguns contornos para o Buildroot antigo (GCC 14 para as ferramentas do host,
-CMake 3.31 no `PATH`, `CMAKE_POLICY_VERSION_MINIMUM=3.5`, `LC_ALL=C`, `TERM`, `dpkg-deb`, `rsync` e o `scripts/fetch_gitlab.py`
+Ou passo a passo:
+
+```bash
+./scripts/bootstrap.sh
+cd recalbox && make recalbox-q6a_defconfig && make -j"$(nproc)" && make legal-info
+../scripts/make-release.sh v0.1.2 output/images/recalbox/recalbox-q6a.img.xz ../release/v0.1.2   # partes <= 1,4 GB + somas SHA-256
+```
+
+Hosts muito novos (ex.: Ubuntu 26.04) precisam de alguns contornos para o Buildroot antigo (GCC 14 para as ferramentas do host via `HOSTCC14`/`HOSTCXX14`,
+CMake 3.31 em `CMAKE3_BIN`, `CMAKE_POLICY_VERSION_MINIMUM=3.5`, `LC_ALL=C`, `TERM`, `dpkg-deb`, `rsync` e o `scripts/fetch_gitlab.py`
 para os tarballs do gitlab.com que retornam 403). Estão listados no [docs/PLAN.md](docs/PLAN.md).
 
 **Atualizar uma placa já rodando sem regravar:** copie `output/images/boot-data/boot/recalbox` para `/boot/boot/recalbox.new`
-(remonte o `/boot` como leitura e escrita), renomeie por cima de `recalbox` (guarde o antigo como `recalbox.old`) e reinicie.
+(remonte o `/boot` como leitura e escrita; só cabem dois arquivos de sistema, então apague antes o `recalbox.old` mais antigo), renomeie por cima de `recalbox`
+(guarde o antigo como `recalbox.old`), confira o `md5sum` e reinicie. Com uma chave SSH instalada, envie direto da máquina de build por SSH.
 
 ### Firmware e licenças
 
+Este é um port da comunidade, **não oficial e não comercial**; leia o [NOTICE.md](NOTICE.md) e o [LICENSE-RECALBOX.md](LICENSE-RECALBOX.md) antes de redistribuir qualquer coisa.
 O build baixa os pacotes de firmware da Radxa ([radxa-pkg](https://github.com/radxa-pkg): firmware dos DSPs, topologia AudioReach,
-`alsa-ucm-conf`, AIC8800) e não os redistribui neste repositório. O driver `aic8800` é GPL-2.0.
+`alsa-ucm-conf`, AIC8800); são proprietários, não ficam neste repositório e vão dentro da imagem. O driver `aic8800` é GPL-2.0.
+Toda release traz o `q6a-legal-info_<versao>.tar.gz` (licenças e lista de fontes de cada pacote, do `make legal-info` do Buildroot).
 
 ### Créditos
 
@@ -286,4 +392,5 @@ O build baixa os pacotes de firmware da Radxa ([radxa-pkg](https://github.com/ra
 
 ### Licença
 
-[MIT](LICENSE). O Recalbox oficial e os emuladores mantêm suas próprias licenças.
+Os scripts, instaladores e documentos deste repositório são [MIT](LICENSE). A **imagem** é derivada do Recalbox e é distribuída sob a licença do
+Recalbox: **não comercial**, veja o [LICENSE-RECALBOX.md](LICENSE-RECALBOX.md) e o [NOTICE.md](NOTICE.md). Os emuladores e demais componentes mantêm suas próprias licenças.
