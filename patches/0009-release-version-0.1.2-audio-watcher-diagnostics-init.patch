@@ -1,0 +1,184 @@
+From 98009abf057ebc2557ad513c8f377bf7e07eea6d Mon Sep 17 00:00:00 2001
+From: Rafael WMS <rafael.wms@live.com>
+Date: Wed, 21 Oct 2026 22:27:17 -0300
+Subject: [PATCH] release: version 0.1.2 (audio watcher + diagnostics init
+ scripts, 1080p60 default, conf keys)
+
+- /usr/bin/q6a-audiofix + S14q6a-audiofix: restart the HDMI audio port when the DSP fails to start it (retry if no sink yet); q6a.audiofix=0 disables
+- S14q6a-diag: persistent kernel log + heartbeat (<= 50 MB per boot); q6a.diaglog=0 disables
+- grub.cfg: video=HDMI-A-1:1920x1080@60
+- recalbox.version 0.1.2; recalbox.conf documents the new keys
+
+Co-Authored-By: Claude Sonnet 5.5 <noreply@anthropic.com>
+---
+ .../q6a/fsoverlay/etc/init.d/S14q6a-audiofix  | 21 +++++++++
+ .../q6a/fsoverlay/etc/init.d/S14q6a-diag      | 35 +++++++++++++++
+ .../q6a/fsoverlay/recalbox/recalbox.version   |  2 +-
+ .../q6a/fsoverlay/usr/bin/q6a-audiofix        | 44 +++++++++++++++++++
+ board/recalbox/qualcomm/q6a/grub.cfg          |  4 +-
+ package/recalbox-system/q6a/recalbox.conf     |  6 +++
+ 6 files changed, 109 insertions(+), 3 deletions(-)
+ create mode 100755 board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S14q6a-audiofix
+ create mode 100755 board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S14q6a-diag
+ create mode 100755 board/recalbox/qualcomm/q6a/fsoverlay/usr/bin/q6a-audiofix
+
+diff --git a/board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S14q6a-audiofix b/board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S14q6a-audiofix
+new file mode 100755
+index 0000000..9f3ff90
+--- /dev/null
++++ b/board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S14q6a-audiofix
+@@ -0,0 +1,21 @@
++#!/bin/sh
++# Start the HDMI audio self-heal watcher (see /usr/bin/q6a-audiofix). Disable with q6a.audiofix=0 in recalbox.conf.
++CONF=/recalbox/share/system/recalbox.conf
++PIDFILE=/run/q6a-audiofix.pid
++case "$1" in
++  start)
++    grep -q "^q6a\.audiofix=0" "$CONF" 2>/dev/null && exit 0
++    [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null && exit 0
++    /usr/bin/q6a-audiofix >/dev/null 2>&1 &
++    echo $! > "$PIDFILE"
++    ;;
++  stop)
++    [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null
++    pkill -f "cat /dev/kmsg" 2>/dev/null
++    rm -f "$PIDFILE"
++    ;;
++  restart) "$0" stop; "$0" start ;;
++  status) ;;
++  *) echo "Usage: $0 {start|stop|restart}" >&2; exit 1 ;;
++esac
++exit 0
+diff --git a/board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S14q6a-diag b/board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S14q6a-diag
+new file mode 100755
+index 0000000..30c2275
+--- /dev/null
++++ b/board/recalbox/qualcomm/q6a/fsoverlay/etc/init.d/S14q6a-diag
+@@ -0,0 +1,35 @@
++#!/bin/sh
++# Persistent diagnostics for bug reports (on by default, a few MB at most):
++#   /recalbox/share/system/logs/q6a-kernel.log   kernel log + a heartbeat every 5 s (current boot), .1.log / .2.log = previous boots
++# Capped at 50 MB per boot. Disable with q6a.diaglog=0 in recalbox.conf. Attach these files when reporting a problem.
++CONF=/recalbox/share/system/recalbox.conf
++L=/recalbox/share/system/logs
++K=$L/q6a-kernel.log
++PIDFILE=/run/q6a-diag.pid
++case "$1" in
++  start)
++    grep -q "^q6a\.diaglog=0" "$CONF" 2>/dev/null && exit 0
++    [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null && exit 0
++    mkdir -p "$L"
++    rm -f "$L/q6a-kernel.2.log"
++    [ -f "$L/q6a-kernel.1.log" ] && mv "$L/q6a-kernel.1.log" "$L/q6a-kernel.2.log"
++    [ -f "$K" ] && mv "$K" "$L/q6a-kernel.1.log"
++    mountpoint -q /sys/kernel/debug || mount -t debugfs none /sys/kernel/debug 2>/dev/null
++    ( cat /dev/kmsg >> "$K" 2>/dev/null & )
++    ( while true; do
++        [ "$(wc -c < "$K" 2>/dev/null || echo 0)" -gt 52428800 ] && exit 0
++        mode=$(grep -h -m1 "mode:" /sys/kernel/debug/dri/*/state 2>/dev/null | head -1 | cut -c1-48)
++        echo "HB $(date "+%m-%d %H:%M:%S") up=$(cut -d" " -f1 /proc/uptime) load=$(cut -d" " -f1-3 /proc/loadavg) temp=$(cat /sys/class/thermal/thermal_zone*/temp 2>/dev/null | sort -n | tail -1) js=$(ls /dev/input/js* 2>/dev/null | wc -l) ra=$(pgrep -x retroarch | head -1) es=$(pgrep -x emulationstation | head -1) memkb=$(awk "/MemAvailable/{print \$2}" /proc/meminfo) $mode" >> "$K"
++        sleep 5
++      done ) &
++    echo $! > "$PIDFILE"
++    ;;
++  stop)
++    [ -f "$PIDFILE" ] && kill "$(cat "$PIDFILE")" 2>/dev/null
++    rm -f "$PIDFILE"
++    ;;
++  restart) "$0" stop; "$0" start ;;
++  status) ;;
++  *) echo "Usage: $0 {start|stop|restart}" >&2; exit 1 ;;
++esac
++exit 0
+diff --git a/board/recalbox/qualcomm/q6a/fsoverlay/recalbox/recalbox.version b/board/recalbox/qualcomm/q6a/fsoverlay/recalbox/recalbox.version
+index 17e51c3..d917d3e 100644
+--- a/board/recalbox/qualcomm/q6a/fsoverlay/recalbox/recalbox.version
++++ b/board/recalbox/qualcomm/q6a/fsoverlay/recalbox/recalbox.version
+@@ -1 +1 @@
+-0.1.1
++0.1.2
+diff --git a/board/recalbox/qualcomm/q6a/fsoverlay/usr/bin/q6a-audiofix b/board/recalbox/qualcomm/q6a/fsoverlay/usr/bin/q6a-audiofix
+new file mode 100755
+index 0000000..486170b
+--- /dev/null
++++ b/board/recalbox/qualcomm/q6a/fsoverlay/usr/bin/q6a-audiofix
+@@ -0,0 +1,44 @@
++#!/bin/bash
++# q6a-audiofix: self-heal the HDMI audio port start failure of the Radxa Dragon Q6A.
++# Symptom: the DSP fails to start the DisplayPort audio port (kernel: "Failed to start APM port 104 ... DISPLAY_PORT_RX_0",
++# ASoC error -22). PulseAudio still reports the sink RUNNING, nothing consumes the audio and the application
++# (RetroArch, EmulationStation) blocks forever waiting for it: the game "freezes" on its first frame.
++# Cycling the sink (suspend/resume) makes the kernel start the port again and the application resumes.
++# Started by /etc/init.d/S14q6a-audiofix. Disable with q6a.audiofix=0 in recalbox.conf.
++export PULSE_SERVER=unix:/run/user/0/pulse/native XDG_RUNTIME_DIR=/run/user/0
++LOG=/recalbox/share/system/logs/q6a-audiofix.log
++mkdir -p "$(dirname "$LOG")"
++log() { echo "$(date "+%m-%d %H:%M:%S") $*" >> "$LOG"; }
++[ -f "$LOG" ] && [ "$(wc -c < "$LOG")" -gt 1048576 ] && mv "$LOG" "$LOG.old"
++
++heal() {
++  local sink i
++  for i in 1 2 3 4 5; do                                 # PulseAudio may not have its HDMI sink yet: retry
++    sink=$(pactl list short sinks 2>/dev/null | awk "/HDMI/{print \$2; exit}")
++    [ -n "$sink" ] && break
++    log "no HDMI sink found (try $i)"; sleep 2
++  done
++  [ -n "$sink" ] || return 1
++  pactl suspend-sink "$sink" 1 2>/dev/null
++  sleep 1
++  pactl suspend-sink "$sink" 0 2>/dev/null
++  log "cycled $sink"
++}
++
++start_us=$(awk "{printf \"%d\", \$1 * 1000000}" /proc/uptime)
++last=0; win_start=0; tries=0
++log "watcher started (kernel time ${start_us} us)"
++cat /dev/kmsg 2>/dev/null | while IFS= read -r line; do
++  case "$line" in *"Failed to start APM port"*) ;; *) continue ;; esac
++  IFS=, read -r _ _ ts _ <<< "$line"
++  [ "${ts:-0}" -lt "$start_us" ] && continue            # message from before the watcher started
++  now=$(date +%s)
++  [ $((now - last)) -lt 3 ] && continue                  # one attempt at a time
++  [ $((now - win_start)) -gt 60 ] && { win_start=$now; tries=0; }
++  tries=$((tries + 1))
++  [ "$tries" -gt 5 ] && { log "giving up for this minute (kernel keeps failing)"; continue; }
++  last=$now
++  log "audio port start failed (kernel ts ${ts}); attempt $tries"
++  heal
++  last=$(date +%s)
++done
+diff --git a/board/recalbox/qualcomm/q6a/grub.cfg b/board/recalbox/qualcomm/q6a/grub.cfg
+index 9579d9c..289a654 100644
+--- a/board/recalbox/qualcomm/q6a/grub.cfg
++++ b/board/recalbox/qualcomm/q6a/grub.cfg
+@@ -2,11 +2,11 @@ set default="0"
+ set timeout="3"
+ 
+ menuentry "Recalbox" {
+-	linux /boot/linux label=RECALBOX console=tty1 console=ttyMSM0,115200n8 quiet loglevel=3 coherent_pool=2M
++	linux /boot/linux label=RECALBOX console=tty1 console=ttyMSM0,115200n8 quiet loglevel=3 video=HDMI-A-1:1920x1080@60 coherent_pool=2M
+ 	initrd /boot/initrd.gz
+ }
+ 
+ menuentry "Recalbox (verbose)" {
+-	linux /boot/linux label=RECALBOX console=tty1 console=ttyMSM0,115200n8 loglevel=7 coherent_pool=2M
++	linux /boot/linux label=RECALBOX console=tty1 console=ttyMSM0,115200n8 loglevel=7 video=HDMI-A-1:1920x1080@60 coherent_pool=2M
+ 	initrd /boot/initrd.gz
+ }
+diff --git a/package/recalbox-system/q6a/recalbox.conf b/package/recalbox-system/q6a/recalbox.conf
+index d2d3a17..c4590b6 100644
+--- a/package/recalbox-system/q6a/recalbox.conf
++++ b/package/recalbox-system/q6a/recalbox.conf
+@@ -571,3 +571,9 @@ global.netplay.lobby=http://lobby.libretro.com/list/
+ ## runahead: emulate one frame ahead to hide the game's own input delay; reducelatency: shorter video queue
+ ;global.runahead=1
+ ;global.reducelatency=1
++
++## Radxa Dragon Q6A extras
++## HDMI audio self-heal watcher (restarts the audio port when the DSP fails to start it). 0 = disable.
++;q6a.audiofix=1
++## Persistent kernel log + heartbeat in /recalbox/share/system/logs/q6a-kernel.log (attach it to bug reports). 0 = disable.
++;q6a.diaglog=1
+-- 
+2.53.0
+
